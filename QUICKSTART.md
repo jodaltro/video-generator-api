@@ -8,23 +8,26 @@
 ./build_and_push.sh
 ```
 
-### 2. Download Models (First Time)
+### 2. Start the API
 
 ```bash
-docker run --gpus all -v models-cache:/workspace/models video-generator-api:latest python download_models.py
+docker run --gpus all -p 8000:8000 \
+  -v workspace-data:/workspace \
+  -v pip-packages:/usr/local/lib/python3.10/dist-packages \
+  -v pip-bin:/usr/local/bin \
+  -v ltx2-repo:/opt/LTX-2 \
+  video-generator-api:latest
 ```
 
-This downloads ~30 GB of model files. Takes 10-30 minutes.
+On first run, the container will automatically:
+1. Install Python dependencies (PyTorch, LTX-2, etc.)
+2. Download ~30 GB of model files (takes 10-30 minutes)
 
-### 3. Start the API
-
-```bash
-docker run --gpus all -p 8000:8000 -v models-cache:/workspace/models video-generator-api:latest
-```
+Subsequent starts will skip installation if volumes are preserved.
 
 The API will start on http://localhost:8000
 
-### 4. Access Swagger UI
+### 3. Access Swagger UI
 
 Open your browser and go to: http://localhost:8000
 
@@ -33,7 +36,7 @@ You'll see the interactive API documentation where you can:
 - Try the API directly from the browser
 - See request/response examples
 
-### 5. Generate Your First Video
+### 4. Generate Your First Video
 
 Using the Swagger UI:
 1. Click on `POST /generate`
@@ -74,10 +77,10 @@ docker-compose down
 ## Important Notes
 
 ### First Run
-- You must download models before the first video generation
-- Run `python download_models.py` inside the container
+- Dependencies and models are installed/downloaded automatically on first start
+- The image is lightweight; Python packages are installed at runtime
 - Models are ~30 GB total (LTX-2 checkpoint + Gemma encoder + upscaler + LoRA)
-- Models persist in the volume across container restarts
+- Use persistent volumes to avoid re-downloading on restarts
 
 ### Hardware Requirements
 - **GPU (NVIDIA)**: Required - CUDA 12.1+ compatible
