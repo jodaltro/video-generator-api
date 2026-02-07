@@ -34,8 +34,13 @@ RUN python -m pip install --no-cache-dir --upgrade pip
 # Set working directory
 WORKDIR /app
 
-# Copy application code and requirements
+# Copy requirements first (for Docker layer caching)
 COPY requirements.txt .
+
+# Install Python dependencies into the image so they are always available
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
 COPY main.py .
 COPY video_generator.py .
 COPY config.py .
