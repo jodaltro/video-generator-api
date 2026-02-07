@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Model cache
+.cache/
+models/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+
+# Videos
+*.mp4
+*.avi
+*.mov
+
+# Environment
+.env
+
+# Test outputs
+example_*.mp4
+test_output.mp4
