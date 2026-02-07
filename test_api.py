@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script for Video Generator API
+Test script for Video Generator API (LTX-2)
 """
 import requests
 import sys
@@ -24,44 +24,44 @@ def test_health_check(base_url: str = "http://localhost:8000"):
 def test_generate_video(base_url: str = "http://localhost:8000"):
     """Test video generation endpoint"""
     print("\n🎬 Testing video generation endpoint...")
-    print("Note: First generation will take longer as models are downloaded...")
-    
+    print("Note: First generation will take longer as models are loaded...")
+
     payload = {
-        "prompt": "A serene sunset over the ocean with waves gently rolling",
+        "prompt": "A serene sunset over the ocean with waves gently rolling, golden light reflecting on the water surface",
         "duration": 2.0,
         "fps": 25,
-        "width": 256,
-        "height": 256,
-        "num_inference_steps": 20,
+        "width": 512,
+        "height": 768,
+        "num_inference_steps": 40,
         "guidance_scale": 3.0,
         "seed": 42
     }
-    
+
     try:
         print(f"Sending request with payload: {payload}")
         start_time = time.time()
-        
+
         response = requests.post(
             f"{base_url}/generate",
             json=payload,
-            timeout=600  # 10 minutes timeout for model download + generation
+            timeout=600  # 10 minutes timeout for model loading + generation
         )
         response.raise_for_status()
-        
+
         elapsed_time = time.time() - start_time
-        
+
         # Save the video
         output_file = "test_output.mp4"
         with open(output_file, "wb") as f:
             f.write(response.content)
-        
+
         file_size = len(response.content) / 1024 / 1024  # MB
         print(f"✓ Video generated successfully!")
         print(f"  - Time taken: {elapsed_time:.2f} seconds")
         print(f"  - File size: {file_size:.2f} MB")
         print(f"  - Saved to: {output_file}")
         return True
-        
+
     except requests.exceptions.Timeout:
         print("✗ Request timed out. This might happen on first run or slow hardware.")
         print("  Try increasing the timeout or check the server logs.")
@@ -74,20 +74,20 @@ def test_generate_video(base_url: str = "http://localhost:8000"):
 def main():
     """Run all tests"""
     base_url = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8000"
-    
-    print(f"Testing Video Generator API at {base_url}\n")
+
+    print(f"Testing Video Generator API (LTX-2) at {base_url}\n")
     print("=" * 60)
-    
+
     # Test health check
     if not test_health_check(base_url):
         print("\n❌ Health check failed. Is the server running?")
         return 1
-    
+
     # Test video generation
     if not test_generate_video(base_url):
         print("\n❌ Video generation test failed.")
         return 1
-    
+
     print("\n" + "=" * 60)
     print("✅ All tests passed!")
     return 0

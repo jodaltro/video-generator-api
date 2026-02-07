@@ -1,88 +1,113 @@
 """
 Video Generator Service using LTX-2 Model
+
+Uses the official LTX-2 pipelines from the Lightricks/LTX-2 repository.
+Supports text-to-video generation with the DistilledPipeline for fast inference.
 """
 import os
 import logging
 import torch
-import numpy as np
 from typing import Optional
-from diffusers import LTXPipeline
-import tempfile
 
 logger = logging.getLogger(__name__)
 
 
 class VideoGenerator:
     """Video generator using LTX-2 model"""
-    
-    def __init__(self, model_id: str = "Lightricks/LTX-Video"):
+
+    def __init__(
+        self,
+        checkpoint_path: str,
+        spatial_upsampler_path: str,
+        gemma_root: str,
+        distilled_lora_path: Optional[str] = None,
+        enable_fp8: bool = True,
+    ):
         """
-        Initialize the video generator
-        
+        Initialize the video generator with LTX-2 model paths.
+
         Args:
-            model_id: HuggingFace model ID for LTX-2
+            checkpoint_path: Path to LTX-2 checkpoint .safetensors file
+            spatial_upsampler_path: Path to spatial upscaler .safetensors file
+            gemma_root: Path to Gemma text encoder directory
+            distilled_lora_path: Path to distilled LoRA .safetensors file (optional)
+            enable_fp8: Whether to enable FP8 transformer for lower memory
         """
-        self.model_id = model_id
+        self.checkpoint_path = checkpoint_path
+        self.spatial_upsampler_path = spatial_upsampler_path
+        self.gemma_root = gemma_root
+        self.distilled_lora_path = distilled_lora_path
+        self.enable_fp8 = enable_fp8
         self.pipeline = None
         self.device = self._get_device()
         logger.info(f"VideoGenerator initialized with device: {self.device}")
-    
+
     def _get_device(self) -> str:
         """Determine the best available device"""
         if torch.cuda.is_available():
             return "cuda"
-        elif torch.backends.mps.is_available():
+        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
             return "mps"
         else:
             return "cpu"
-    
+
     def is_loaded(self) -> bool:
         """Check if the model is loaded"""
         return self.pipeline is not None
-    
+
+    def _validate_model_files(self):
+        """Validate that all required model files exist"""
+        missing = []
+        if not os.path.exists(self.checkpoint_path):
+            missing.append(f"Checkpoint: {self.checkpoint_path}")
+        if not os.path.exists(self.spatial_upsampler_path):
+            missing.append(f"Spatial upsampler: {self.spatial_upsampler_path}")
+        if not os.path.isdir(self.gemma_root):
+            missing.append(f"Gemma encoder directory: {self.gemma_root}")
+        if missing:
+            msg = "Missing model files:\n" + "\n".join(f"  - {m}" for m in missing)
+            msg += "\n\nRun 'python download_models.py' to download them."
+            raise FileNotFoundError(msg)
+
     def _load_model(self):
         """Load the LTX-2 model (lazy loading)"""
         if self.pipeline is not None:
             return
-        
-        logger.info(f"Loading LTX-2 model from {self.model_id}...")
-        logger.info("This may take a while on first run as models are downloaded...")
-        
+
+        logger.info("Loading LTX-2 model...")
+        self._validate_model_files()
+
         try:
-            # Load the pipeline
-            self.pipeline = LTXPipeline.from_pretrained(
-                self.model_id,
-                torch_dtype=torch.bfloat16 if self.device == "cuda" else torch.float32,
+            from ltx_pipelines.distilled import DistilledPipeline
+
+            self.pipeline = DistilledPipeline(
+                checkpoint_path=self.checkpoint_path,
+                spatial_upsampler_path=self.spatial_upsampler_path,
+                gemma_root=self.gemma_root,
+                loras=[],
+                fp8transformer=self.enable_fp8,
             )
-            
-            # Move to device
-            self.pipeline.to(self.device)
-            
-            # Enable memory optimizations if on CUDA
-            if self.device == "cuda":
-                self.pipeline.enable_model_cpu_offload()
-                self.pipeline.enable_vae_slicing()
-            
-            logger.info("Model loaded successfully!")
-            
+
+            logger.info("LTX-2 model loaded successfully!")
+
         except Exception as e:
-            logger.error(f"Failed to load model: {str(e)}")
+            logger.error(f"Failed to load LTX-2 model: {str(e)}")
             raise
-    
+
     def generate(
         self,
         prompt: str,
-        num_frames: int = 81,
+        num_frames: int = 121,
         width: int = 512,
-        height: int = 512,
-        num_inference_steps: int = 30,
+        height: int = 768,
+        num_inference_steps: int = 40,
         guidance_scale: float = 3.0,
         fps: int = 25,
-        seed: Optional[int] = None
-    ) -> bytes:
+        seed: Optional[int] = None,
+    ) -> str:
         """
-        Generate a video from text prompt
-        
+        Generate a video from text prompt using LTX-2.
+
         Args:
             prompt: Text description of the video
             num_frames: Number of frames to generate
@@ -92,122 +117,37 @@ class VideoGenerator:
             guidance_scale: Guidance scale for prompt adherence
             fps: Frames per second for output video
             seed: Random seed for reproducibility
-            
+
         Returns:
-            Video bytes in MP4 format
+            Path to generated MP4 file
         """
+        import tempfile
+
         # Load model if not already loaded
         self._load_model()
-        
-        # Set seed for reproducibility
-        generator = None
-        if seed is not None:
-            generator = torch.Generator(device=self.device).manual_seed(seed)
-            logger.info(f"Using seed: {seed}")
-        
-        logger.info(f"Generating video: {width}x{height}, {num_frames} frames, {fps} fps")
-        
-        # Generate video
-        output = self.pipeline(
+
+        if seed is None:
+            seed = torch.randint(0, 2**32, (1,)).item()
+        logger.info(f"Using seed: {seed}")
+
+        logger.info(
+            f"Generating video: {width}x{height}, {num_frames} frames, {fps} fps"
+        )
+
+        # Create output path securely
+        fd, output_path = tempfile.mkstemp(suffix=".mp4")
+        os.close(fd)
+
+        # Generate video using LTX-2 DistilledPipeline
+        self.pipeline(
             prompt=prompt,
-            num_frames=num_frames,
+            output_path=output_path,
+            seed=seed,
             height=height,
             width=width,
-            num_inference_steps=num_inference_steps,
-            guidance_scale=guidance_scale,
-            generator=generator,
+            num_frames=num_frames,
+            frame_rate=float(fps),
         )
-        
-        # Get video frames
-        video_frames = output.frames[0]  # Shape: (num_frames, height, width, channels)
-        
-        # Convert to MP4 using opencv or imageio
-        video_bytes = self._frames_to_mp4(video_frames, fps)
-        
-        return video_bytes
-    
-    def _frames_to_mp4(self, frames: np.ndarray, fps: int) -> bytes:
-        """
-        Convert frames to MP4 bytes
-        
-        Args:
-            frames: Video frames array
-            fps: Frames per second
-            
-        Returns:
-            MP4 video bytes
-        """
-        try:
-            import cv2
-            
-            # Create temporary file
-            with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tmp_file:
-                tmp_path = tmp_file.name
-            
-            try:
-                # Get frame dimensions
-                height, width = frames.shape[1:3]
-                
-                # Initialize video writer
-                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                out = cv2.VideoWriter(tmp_path, fourcc, fps, (width, height))
-                
-                # Write frames
-                for frame in frames:
-                    # Convert RGB to BGR for OpenCV
-                    if frame.dtype != np.uint8:
-                        frame = (frame * 255).astype(np.uint8)
-                    frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-                    out.write(frame_bgr)
-                
-                out.release()
-                
-                # Read the video file as bytes
-                with open(tmp_path, 'rb') as f:
-                    video_bytes = f.read()
-                
-                return video_bytes
-                
-            finally:
-                # Clean up temporary file
-                if os.path.exists(tmp_path):
-                    os.remove(tmp_path)
-                    
-        except ImportError:
-            # Fallback to imageio if opencv not available
-            logger.warning("OpenCV not available, falling back to imageio")
-            return self._frames_to_mp4_imageio(frames, fps)
-    
-    def _frames_to_mp4_imageio(self, frames: np.ndarray, fps: int) -> bytes:
-        """
-        Convert frames to MP4 bytes using imageio
-        
-        Args:
-            frames: Video frames array
-            fps: Frames per second
-            
-        Returns:
-            MP4 video bytes
-        """
-        import imageio
-        
-        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tmp_file:
-            tmp_path = tmp_file.name
-        
-        try:
-            # Ensure frames are uint8
-            if frames.dtype != np.uint8:
-                frames = (frames * 255).astype(np.uint8)
-            
-            # Write video
-            imageio.mimwrite(tmp_path, frames, fps=fps, codec='libx264')
-            
-            # Read as bytes
-            with open(tmp_path, 'rb') as f:
-                video_bytes = f.read()
-            
-            return video_bytes
-            
-        finally:
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
+
+        logger.info(f"Video generated: {output_path}")
+        return output_path

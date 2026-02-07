@@ -1,27 +1,30 @@
-# Quick Start Guide
+# Quick Start Guide (LTX-2)
 
-## Local Development (Without Docker)
+## Docker Deployment (Recommended)
 
-### 1. Install Dependencies
+### 1. Build the Docker Image
 
 ```bash
-# Create virtual environment (recommended)
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install requirements
-pip install -r requirements.txt
+./build_and_push.sh
 ```
 
-### 2. Start the API
+### 2. Download Models (First Time)
 
 ```bash
-python main.py
+docker run --gpus all -v models-cache:/workspace/models video-generator-api:latest python download_models.py
+```
+
+This downloads ~30 GB of model files. Takes 10-30 minutes.
+
+### 3. Start the API
+
+```bash
+docker run --gpus all -p 8000:8000 -v models-cache:/workspace/models video-generator-api:latest
 ```
 
 The API will start on http://localhost:8000
 
-### 3. Access Swagger UI
+### 4. Access Swagger UI
 
 Open your browser and go to: http://localhost:8000
 
@@ -30,7 +33,7 @@ You'll see the interactive API documentation where you can:
 - Try the API directly from the browser
 - See request/response examples
 
-### 4. Generate Your First Video
+### 5. Generate Your First Video
 
 Using the Swagger UI:
 1. Click on `POST /generate`
@@ -44,17 +47,15 @@ Using curl:
 curl -X POST "http://localhost:8000/generate" \
   -H "Content-Type: application/json" \
   -d '{
-    "prompt": "A cat playing with a ball",
+    "prompt": "A cat playing with a ball of yarn in a cozy living room",
     "duration": 3.0,
     "width": 512,
-    "height": 512
+    "height": 768
   }' \
   --output my_video.mp4
 ```
 
-## Docker Deployment
-
-### Using Docker Compose (Recommended)
+## Docker Compose
 
 ```bash
 # Start the service
@@ -70,75 +71,41 @@ docker-compose logs -f
 docker-compose down
 ```
 
-### Using Docker Directly
-
-```bash
-# Build
-docker build -t video-generator-api .
-
-# Run
-docker run -p 8000:8000 video-generator-api
-
-# Run with GPU (NVIDIA)
-docker run --gpus all -p 8000:8000 video-generator-api
-
-# Run with persistent cache
-docker run -p 8000:8000 \
-  -v $(pwd)/cache:/root/.cache/huggingface \
-  video-generator-api
-```
-
 ## Important Notes
 
 ### First Run
-- The first video generation will take 10-20 minutes
-- This is because the LTX-Video model (~10-15 GB) needs to download
-- Subsequent generations will be much faster
-- Models are cached in `~/.cache/huggingface/`
+- You must download models before the first video generation
+- Run `python download_models.py` inside the container
+- Models are ~30 GB total (LTX-2 checkpoint + Gemma encoder + upscaler + LoRA)
+- Models persist in the volume across container restarts
 
 ### Hardware Requirements
-- **CPU only**: Works but slow (~20-30 min per video)
-- **GPU (NVIDIA)**: Fast (~1-3 min per video)
-- **Minimum RAM**: 16 GB
-- **Recommended RAM**: 32 GB
-- **Disk space**: 20 GB minimum (for models)
-
-### GPU Support
-The API automatically detects and uses GPU if available:
-- CUDA (NVIDIA GPUs)
-- MPS (Apple Silicon)
-- Falls back to CPU if no GPU detected
+- **GPU (NVIDIA)**: Required - CUDA 12.1+ compatible
+- **Minimum VRAM**: 24 GB (RTX 4090, with FP8 checkpoint)
+- **Recommended VRAM**: 48 GB (A40) or 80 GB (A100)
+- **RAM**: 32 GB minimum
+- **Disk space**: 50 GB minimum (for models)
 
 ### Performance Tips
 For faster generation:
-- Lower resolution (256x256 or 384x384)
-- Fewer inference steps (20-25 instead of 30-50)
-- Shorter videos (2-3 seconds)
+- Use the DistilledPipeline (default) - fastest with predefined sigmas
+- Use FP8 checkpoint (default) - lower memory footprint
+- Lower resolution (384x512)
 
 For better quality:
-- Higher resolution (768x768 or 1024x1024)
-- More inference steps (40-50)
-- Higher guidance scale (4-5)
+- Use `ltx-2-19b-dev` checkpoint
+- Higher resolution (768x1024)
+- More inference steps
 
-## Troubleshooting
+## Build and Push to Docker Hub
 
-### "Connection refused" error
-- Make sure the API is running: `python main.py`
-- Check the correct port: default is 8000
+```bash
+# Build and push
+./build_and_push.sh --push --username your-username
 
-### "CUDA out of memory"
-- Reduce resolution: try 256x256
-- Reduce num_frames: try 40-60
-- Use a GPU with more VRAM
-
-### Model download is slow
-- This is normal on first run
-- Depends on your internet speed
-- Models are ~10-15 GB total
-
-### "Module not found" errors
-- Make sure you installed all requirements: `pip install -r requirements.txt`
-- Activate virtual environment if using one
+# With version tag
+./build_and_push.sh --push --username your-username --tag v2.0
+```
 
 ## Testing
 
@@ -147,14 +114,8 @@ Run the test suite:
 python test_api.py
 ```
 
-Run the examples:
-```bash
-python examples.py
-```
-
 ## Next Steps
 
 - Read the full [README.md](README.md) for detailed documentation
 - Check [RUNPOD_DEPLOYMENT.md](RUNPOD_DEPLOYMENT.md) for cloud deployment
 - Explore the Swagger UI for all API options
-- Experiment with different prompts and parameters
