@@ -34,13 +34,9 @@ RUN python -m pip install --no-cache-dir --upgrade pip
 # Set working directory
 WORKDIR /app
 
-# Copy requirements first (for Docker layer caching)
+# Copy application code (dependencies are installed at runtime via start.sh
+# and persisted on Docker volumes to keep the image lightweight)
 COPY requirements.txt .
-
-# Install Python dependencies into the image so they are always available
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application code
 COPY main.py .
 COPY video_generator.py .
 COPY config.py .
@@ -56,7 +52,7 @@ EXPOSE 8000
 
 # Health check (start-period accounts for first-run dependency installation and model download)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=600s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
+    CMD curl -f http://localhost:8000/health || exit 1
 
 # Run the application (installs dependencies and downloads models on first start, then starts the API)
 CMD ["./start.sh"]
