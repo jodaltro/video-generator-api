@@ -52,6 +52,8 @@ COPY main.py .
 COPY video_generator.py .
 COPY config.py .
 COPY download_models.py .
+COPY start.sh .
+RUN chmod +x start.sh
 
 # Create directories for models
 RUN mkdir -p /workspace/models
@@ -63,5 +65,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
 
-# Run the application
-CMD ["python", "main.py"]
+# Run the application (downloads models on first start, then starts the API)
+CMD ["./start.sh"]

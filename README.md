@@ -7,7 +7,7 @@ API para geração de vídeos a partir de texto usando o modelo **LTX-2** da Lig
 - **Modelo LTX-2**: Usa o modelo de última geração LTX-2 (19B parâmetros) da Lightricks
 - **DistilledPipeline**: Pipeline otimizado para inferência rápida (8 sigmas predefinidos)
 - **FP8 Support**: Suporte a FP8 para menor uso de memória VRAM
-- **Download sob demanda**: Modelos baixados na primeira execução via script
+- **Download automático**: Modelos baixados automaticamente na primeira inicialização do pod
 - **Documentação Swagger**: Interface interativa em `/` (raiz)
 - **Pronto para RunPod/Pod GPU**: Otimizado para deployment em pods GPU
 
@@ -19,10 +19,7 @@ API para geração de vídeos a partir de texto usando o modelo **LTX-2** da Lig
 # Build da imagem
 ./build_and_push.sh
 
-# Baixar modelos (primeira vez - ~30 GB)
-docker run --gpus all -v models-cache:/workspace/models video-generator-api:latest python download_models.py
-
-# Executar a API
+# Executar a API (modelos são baixados automaticamente na primeira execução)
 docker run --gpus all -p 8000:8000 -v models-cache:/workspace/models video-generator-api:latest
 ```
 
@@ -170,18 +167,17 @@ PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 ### 4. Primeira Execução
 
-Na primeira execução, execute dentro do pod:
-```bash
-python download_models.py
-```
+Os modelos são baixados automaticamente na primeira inicialização do pod. Basta criar o pod com a imagem Docker e ele começará a baixar os modelos e iniciar a API.
 
-Isso irá baixar:
+Modelos baixados automaticamente:
 1. Checkpoint LTX-2 (~10 GB)
 2. Spatial Upscaler (~2 GB)
 3. Distilled LoRA (~1 GB)
 4. Gemma 3 Text Encoder (~15 GB)
 
 **Tempo estimado**: 10-30 minutos dependendo da velocidade da rede.
+
+> **Nota**: Se os modelos já estiverem presentes no volume persistente, o download é ignorado e a API inicia imediatamente.
 
 ## 🔧 Configuração Avançada
 
