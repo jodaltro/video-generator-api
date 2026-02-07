@@ -29,3 +29,7 @@ models/
 
 # Environment
 .env
+
+# Test outputs
+example_*.mp4
+test_output.mp4
