@@ -2,10 +2,10 @@
 Video Generation API using LTX-2 Model
 Main FastAPI application
 """
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
+from typing import Optional
 import logging
 import io
 import os
