@@ -24,8 +24,7 @@ if [ ! -f "$DEPS_MARKER" ]; then
     if [ ! -d "/opt/LTX-2" ]; then
         git clone https://github.com/Lightricks/LTX-2.git /opt/LTX-2
     fi
-    cd /opt/LTX-2 && pip install --no-cache-dir -e packages/ltx-core && pip install --no-cache-dir -e packages/ltx-pipelines
-    cd /app
+    (cd /opt/LTX-2 && pip install --no-cache-dir -e packages/ltx-core && pip install --no-cache-dir -e packages/ltx-pipelines)
 
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO]  Installing requirements..."
     pip install --no-cache-dir -r requirements.txt
