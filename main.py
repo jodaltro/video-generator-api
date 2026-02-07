@@ -241,4 +241,13 @@ async def generate_video(request: VideoGenerationRequest):
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
+    logger.info("=" * 60)
+    logger.info("  Video Generator API (LTX-2) - Server Starting")
+    logger.info("=" * 60)
+    logger.info(f"  Host: 0.0.0.0")
+    logger.info(f"  Port: {port}")
+    logger.info(f"  Models dir: {settings.models_dir}")
+    logger.info(f"  Swagger UI: http://0.0.0.0:{port}/")
+    logger.info(f"  Health check: http://0.0.0.0:{port}/health")
+    logger.info("=" * 60)
     uvicorn.run(app, host="0.0.0.0", port=port)
