@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  video-generator-api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - HF_HOME=/app/.cache/huggingface
+    volumes:
+      # Mount cache directory to persist models between restarts
+      - huggingface-cache:/app/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+volumes:
+  huggingface-cache:
