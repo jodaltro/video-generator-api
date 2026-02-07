@@ -8,6 +8,7 @@ pydantic-settings==2.1.0
 # PyTorch (install separately for CUDA support in Docker)
 torch>=2.1.0
 torchvision>=0.16.0
+torchaudio>=2.1.0
 
 # LTX-2 dependencies
 # ltx-pipelines and ltx-core are installed from the LTX-2 repo in Docker
