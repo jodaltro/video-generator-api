@@ -13,10 +13,15 @@ echo ""
 
 # Install Python dependencies on first startup
 DEPS_MARKER="/workspace/.deps_installed"
-# Verify that key packages are actually importable; if not, force reinstall
-if [ -f "$DEPS_MARKER" ] && ! python -c "import huggingface_hub" 2>/dev/null; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [WARN]  Marker file exists but packages missing. Reinstalling..."
-    rm -f "$DEPS_MARKER"
+# Verify that key packages are actually importable; if not, force reinstall.
+# This handles the case where the marker file survives on the persistent volume
+# but pip packages are gone (e.g., container image was rebuilt or volumes were
+# not mounted).
+if [ -f "$DEPS_MARKER" ]; then
+    if ! python -c "import importlib.util; exit(0 if all(importlib.util.find_spec(m) for m in ['huggingface_hub','fastapi','transformers','torch']) else 1)" 2>/dev/null; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [WARN]  Marker file exists but packages missing. Reinstalling..."
+        rm -f "$DEPS_MARKER"
+    fi
 fi
 if [ ! -f "$DEPS_MARKER" ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [STEP 1/3] Installing Python dependencies (first run)..."
