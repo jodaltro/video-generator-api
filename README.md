@@ -19,8 +19,13 @@ API para geração de vídeos a partir de texto usando o modelo **LTX-2** da Lig
 # Build da imagem
 ./build_and_push.sh
 
-# Executar a API (modelos são baixados automaticamente na primeira execução)
-docker run --gpus all -p 8000:8000 -v models-cache:/workspace/models video-generator-api:latest
+# Executar a API (dependências e modelos são baixados automaticamente na primeira execução)
+docker run --gpus all -p 8000:8000 \
+  -v workspace-data:/workspace \
+  -v pip-packages:/usr/local/lib/python3.10/dist-packages \
+  -v pip-bin:/usr/local/bin \
+  -v ltx2-repo:/opt/LTX-2 \
+  video-generator-api:latest
 ```
 
 ### Opção 2: Build e Push para Docker Hub
@@ -53,11 +58,8 @@ O script `download_models.py` baixa automaticamente os seguintes modelos do Hugg
 ### Download Manual
 
 ```bash
-# Usando o script
+# Usando o script (dentro do container)
 python download_models.py
-
-# Ou dentro do container
-docker run --gpus all -v models-cache:/workspace/models video-generator-api:latest python download_models.py
 ```
 
 ## 📡 API Endpoints
@@ -167,7 +169,7 @@ PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 ### 4. Primeira Execução
 
-Os modelos são baixados automaticamente na primeira inicialização do pod. Basta criar o pod com a imagem Docker e ele começará a baixar os modelos e iniciar a API.
+Os modelos e dependências Python são baixados automaticamente na primeira inicialização do pod. Basta criar o pod com a imagem Docker e ele começará a instalar as dependências, baixar os modelos e iniciar a API.
 
 Modelos baixados automaticamente:
 1. Checkpoint LTX-2 (~10 GB)

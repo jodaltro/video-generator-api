@@ -16,9 +16,10 @@ This project implements a video generation API using the state-of-the-art **LTX-
 
 ### 🐳 Docker Optimization
 - **NVIDIA CUDA base image**: Full GPU support with CUDA 12.1
+- **Lightweight image**: Python dependencies installed at pod startup, not baked into image
 - **LTX-2 native pipelines**: Uses official ltx-pipelines from Lightricks
 - **Separate model download**: Models downloaded via script, not baked into image
-- **Persistent volumes**: Model files persist across container restarts
+- **Persistent volumes**: Dependencies and model files persist across container restarts
 
 ### ☁️ Pod/RunPod Ready
 - Optimized for GPU deployment (A40/A100 recommended)
@@ -68,9 +69,9 @@ video-generator-api/
 
 ### Docker Image
 - **Base**: nvidia/cuda:12.1.1-devel-ubuntu22.04
-- **System deps**: ffmpeg, CUDA toolkit
-- **Python deps**: PyTorch (CUDA), ltx-pipelines, ltx-core, FastAPI
-- **LTX-2 packages**: Installed from official GitHub repo
+- **System deps**: ffmpeg, CUDA toolkit, Python 3.10
+- **Runtime deps**: PyTorch (CUDA), ltx-pipelines, ltx-core, FastAPI (installed at first startup)
+- **LTX-2 packages**: Installed from official GitHub repo at first startup
 
 ## Required Models (~30 GB total)
 
@@ -105,8 +106,12 @@ Check API status and model loading state.
 ### Docker (Local)
 ```bash
 ./build_and_push.sh
-docker run --gpus all -v models-cache:/workspace/models video-generator-api:latest python download_models.py
-docker run --gpus all -p 8000:8000 -v models-cache:/workspace/models video-generator-api:latest
+docker run --gpus all -p 8000:8000 \
+  -v workspace-data:/workspace \
+  -v pip-packages:/usr/local/lib/python3.10/dist-packages \
+  -v pip-bin:/usr/local/bin \
+  -v ltx2-repo:/opt/LTX-2 \
+  video-generator-api:latest
 ```
 
 ### Docker Hub (Push)

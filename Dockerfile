@@ -34,20 +34,8 @@ RUN python -m pip install --no-cache-dir --upgrade pip
 # Set working directory
 WORKDIR /app
 
-# Install PyTorch with CUDA support
-RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-
-# Clone LTX-2 repository and install its packages
-RUN git clone https://github.com/Lightricks/LTX-2.git /opt/LTX-2 && \
-    cd /opt/LTX-2 && \
-    pip install --no-cache-dir -e packages/ltx-core && \
-    pip install --no-cache-dir -e packages/ltx-pipelines
-
-# Copy requirements and install Python dependencies
+# Copy application code and requirements
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application code
 COPY main.py .
 COPY video_generator.py .
 COPY config.py .
@@ -61,9 +49,9 @@ RUN mkdir -p /workspace/models
 # Expose port
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+# Health check (start-period accounts for first-run dependency installation and model download)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=600s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
 
-# Run the application (downloads models on first start, then starts the API)
+# Run the application (installs dependencies and downloads models on first start, then starts the API)
 CMD ["./start.sh"]

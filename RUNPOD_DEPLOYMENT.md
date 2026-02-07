@@ -51,13 +51,16 @@ This guide explains how to deploy the Video Generator API with LTX-2 on RunPod w
    - **Volume**: 100 GB recommended (for persistent model storage)
 6. Click "Deploy"
 
-## Step 4: Automatic Model Download
+## Step 4: Automatic Setup on First Start
 
-Models are **downloaded automatically** when the pod starts for the first time. No manual intervention is needed — just deploy the pod and the API will:
+When the pod starts for the first time, the container will automatically:
 
-1. Check for existing models in `/workspace/models`
-2. Download any missing models from HuggingFace
-3. Start the API server
+1. **Install Python dependencies** (PyTorch, LTX-2 pipelines, etc.)
+2. Check for existing models in `/workspace/models`
+3. Download any missing models from HuggingFace
+4. Start the API server
+
+> **Note**: The Docker image is lightweight — Python dependencies are installed at runtime to keep the image small. Use persistent volumes to avoid re-installing on restarts.
 
 The download includes:
 - `ltx-2-19b-distilled-fp8.safetensors` (~10 GB)
@@ -68,7 +71,7 @@ The download includes:
 **Total**: ~30 GB
 **Estimated time**: 10-30 minutes depending on network speed.
 
-> **Note**: On subsequent restarts, if models are stored on a persistent volume, the download is skipped and the API starts immediately.
+> **Note**: On subsequent restarts, if dependencies and models are stored on a persistent volume, installation/download is skipped and the API starts immediately.
 
 ## Step 5: Test the API
 

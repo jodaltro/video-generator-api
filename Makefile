@@ -33,10 +33,10 @@ docker-build:
 	./build_and_push.sh
 
 docker-run:
-	docker run -p 8000:8000 -v models-cache:/workspace/models video-generator-api:latest
+	docker run -p 8000:8000 -v workspace-data:/workspace -v pip-packages:/usr/local/lib/python3.10/dist-packages -v pip-bin:/usr/local/bin -v ltx2-repo:/opt/LTX-2 video-generator-api:latest
 
 docker-run-gpu:
-	docker run --gpus all -p 8000:8000 -v models-cache:/workspace/models video-generator-api:latest
+	docker run --gpus all -p 8000:8000 -v workspace-data:/workspace -v pip-packages:/usr/local/lib/python3.10/dist-packages -v pip-bin:/usr/local/bin -v ltx2-repo:/opt/LTX-2 video-generator-api:latest
 
 docker-compose-up:
 	docker-compose up -d
