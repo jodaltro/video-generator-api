@@ -134,8 +134,9 @@ class VideoGenerator:
             f"Generating video: {width}x{height}, {num_frames} frames, {fps} fps"
         )
 
-        # Create output path
-        output_path = tempfile.mktemp(suffix=".mp4")
+        # Create output path securely
+        fd, output_path = tempfile.mkstemp(suffix=".mp4")
+        os.close(fd)
 
         # Generate video using LTX-2 DistilledPipeline
         self.pipeline(

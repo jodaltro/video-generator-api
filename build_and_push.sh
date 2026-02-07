@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Build and Push Docker Image for Video Generator API (LTX-2)
 #
