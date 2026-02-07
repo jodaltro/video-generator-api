@@ -1,8 +1,8 @@
-# RunPod Deployment Guide
+# RunPod Deployment Guide (LTX-2)
 
 ## Overview
 
-This guide explains how to deploy the Video Generator API on RunPod with GPU support.
+This guide explains how to deploy the Video Generator API with LTX-2 on RunPod with GPU support.
 
 ## Prerequisites
 
@@ -13,14 +13,11 @@ This guide explains how to deploy the Video Generator API on RunPod with GPU sup
 ## Step 1: Build and Push Docker Image
 
 ```bash
-# Build the image
-docker build -t your-username/video-generator-api:latest .
+# Build and push using the provided script
+./build_and_push.sh --push --username your-username
 
-# Login to Docker Hub
-docker login
-
-# Push the image
-docker push your-username/video-generator-api:latest
+# Or with a specific tag
+./build_and_push.sh --push --username your-username --tag v2.0
 ```
 
 ## Step 2: Create a RunPod Template
@@ -28,15 +25,17 @@ docker push your-username/video-generator-api:latest
 1. Go to RunPod Templates
 2. Click "New Template"
 3. Configure:
-   - **Template Name**: Video Generator API
+   - **Template Name**: Video Generator API LTX-2
    - **Container Image**: `your-username/video-generator-api:latest`
-   - **Container Disk**: 20 GB (for model cache)
-   - **Volume Path**: `/workspace/.cache` (optional but recommended)
+   - **Container Disk**: 20 GB
+   - **Volume Disk**: 100 GB (for LTX-2 models ~30 GB total)
+   - **Volume Path**: `/workspace`
    - **Expose HTTP Ports**: `8000`
    - **Environment Variables**:
      ```
      PORT=8000
-     HF_HOME=/workspace/.cache/huggingface
+     MODELS_DIR=/workspace/models
+     PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
      ```
 
 ## Step 3: Deploy a Pod
@@ -45,21 +44,36 @@ docker push your-username/video-generator-api:latest
 2. Click "Deploy"
 3. Select your template
 4. Choose GPU:
-   - **Recommended**: NVIDIA A40 (40GB VRAM)
-   - **Minimum**: RTX 3090 (24GB VRAM)
-   - **Budget**: RTX 4090 (24GB VRAM)
+   - **Recommended**: NVIDIA A40 (48GB VRAM) or A100 (80GB VRAM)
+   - **Minimum**: RTX 4090 (24GB VRAM) with FP8 checkpoint
 5. Select Storage:
    - **Container Disk**: 20 GB minimum
-   - **Volume**: 50 GB recommended (for persistent model cache)
+   - **Volume**: 100 GB recommended (for persistent model storage)
 6. Click "Deploy"
 
-## Step 4: First Run
+## Step 4: Download Models (First Run)
 
-On the first run:
-1. Wait 10-20 minutes for model download
-2. Models will be cached in `/workspace/.cache/huggingface/`
-3. Check logs to monitor progress: Pod → Logs
-4. Once ready, the API will respond to `/health` endpoint
+On first deployment, connect to the pod terminal and download models:
+
+```bash
+# Via pod terminal
+python download_models.py
+```
+
+Or run a one-off container:
+```bash
+# This downloads models to the persistent volume
+docker exec <container-id> python download_models.py
+```
+
+The download includes:
+- `ltx-2-19b-distilled-fp8.safetensors` (~10 GB)
+- `ltx-2-spatial-upscaler-x2-1.0.safetensors` (~2 GB)
+- `ltx-2-19b-distilled-lora-384.safetensors` (~1 GB)
+- `gemma-3-12b-it-qat-q4_0-unquantized/` (~15 GB)
+
+**Total**: ~30 GB
+**Estimated time**: 10-30 minutes depending on network speed.
 
 ## Step 5: Test the API
 
@@ -73,10 +87,10 @@ curl https://your-pod-id-8000.proxy.runpod.net/health
 curl -X POST "https://your-pod-id-8000.proxy.runpod.net/generate" \
   -H "Content-Type: application/json" \
   -d '{
-    "prompt": "A cat playing with a ball of yarn",
+    "prompt": "A cat playing with a ball of yarn in a cozy living room",
     "duration": 3.0,
     "width": 512,
-    "height": 512
+    "height": 768
   }' \
   --output video.mp4
 ```
@@ -85,44 +99,30 @@ curl -X POST "https://your-pod-id-8000.proxy.runpod.net/generate" \
 
 ### GPU Selection
 
-| GPU | VRAM | Speed | Cost | Recommended |
-|-----|------|-------|------|-------------|
-| RTX 3090 | 24GB | ~2-3 min/video | $ | Good for testing |
-| RTX 4090 | 24GB | ~1-2 min/video | $$ | Best value |
-| A40 | 48GB | ~1-2 min/video | $$$ | Production |
-| A100 | 80GB | ~1 min/video | $$$$ | High throughput |
+| GPU | VRAM | Speed | Cost | Notes |
+|-----|------|-------|------|-------|
+| RTX 4090 | 24GB | ~2-3 min | $$ | FP8 only |
+| A40 | 48GB | ~1-2 min | $$$ | Recommended |
+| A100 | 80GB | ~1 min | $$$$ | Best performance |
 
 ### Optimization Settings
 
 For faster generation:
-- Use `num_inference_steps: 20-25` (vs 30-50)
-- Use `width: 512, height: 512` (vs 768x768)
-- Use `num_frames: 60-80` (vs 120+)
+- Use the DistilledPipeline (default) - fastest with 8 predefined sigmas
+- Use FP8 checkpoint (default) - lower memory footprint
+- Use `width: 512, height: 768` (default resolution)
 
 For better quality:
-- Use `num_inference_steps: 40-50`
-- Use `guidance_scale: 4-5`
-- Use higher resolution (768x768 or 1024x1024)
+- Use `ltx-2-19b-dev` or `ltx-2-19b-dev-fp8` checkpoint
+- Use higher resolution if VRAM allows
 
 ### Volume Storage
 
 **Recommended setup:**
-- Mount volume at `/workspace/.cache`
-- Set `HF_HOME=/workspace/.cache/huggingface`
+- Mount volume at `/workspace`
+- Set `MODELS_DIR=/workspace/models`
 - Models persist across pod restarts
-- Faster startup after first run
-
-## Cost Estimation
-
-Assuming RTX 4090 at $0.34/hour:
-
-| Videos/hour | Duration | Cost/video |
-|-------------|----------|------------|
-| 30 | 3s | $0.011 |
-| 20 | 5s | $0.017 |
-| 10 | 10s | $0.034 |
-
-*Costs vary by GPU type and provider rates*
+- Much faster startup after first download
 
 ## Troubleshooting
 
@@ -133,18 +133,20 @@ Assuming RTX 4090 at $0.34/hour:
 
 ### Model download fails
 - Check internet connectivity
-- Verify disk space (need 20GB+)
+- Verify disk space (need 50GB+)
 - Check HuggingFace Hub status
+- Re-run `python download_models.py` (supports resume)
 
 ### Out of memory errors
-- Reduce resolution (256x256 or 384x384)
-- Reduce num_frames (40-60)
-- Use GPU with more VRAM
+- Use FP8 checkpoint (default)
+- Reduce resolution (384x512)
+- Reduce num_frames (60-80)
+- Use A40 or A100 GPU
 
-### Slow generation
-- Check if GPU is being used (should see CUDA in logs)
-- Verify GPU is not throttled
-- Try different GPU type
+### "Model files not found" error
+- Run `python download_models.py` first
+- Check that `MODELS_DIR` points to the correct volume path
+- Verify model files exist: `ls /workspace/models/`
 
 ## API Access
 
@@ -154,35 +156,11 @@ RunPod provides: `https://your-pod-id-8000.proxy.runpod.net`
 ### Swagger UI
 Access at: `https://your-pod-id-8000.proxy.runpod.net/`
 
-### Security
-- Use RunPod's built-in authentication
-- Or add your own API key mechanism
-- Consider rate limiting for production
-
-## Scaling
-
-### Horizontal Scaling
-1. Deploy multiple pods
-2. Use load balancer (external)
-3. Each pod handles ~20-30 videos/hour
-
-### Auto-scaling
-- Not natively supported by RunPod
-- Consider Kubernetes alternative
-- Or use serverless endpoints
-
-## Monitoring
-
-Check pod metrics:
-- GPU utilization (should be 80-100% during generation)
-- Memory usage
-- Network I/O
-- Request latency
-
 ## Support
 
 For issues:
 1. Check pod logs first
 2. Verify Docker image works locally
-3. Contact RunPod support if infrastructure issue
-4. Open GitHub issue for API bugs
+3. Verify model files are downloaded
+4. Contact RunPod support if infrastructure issue
+5. Open GitHub issue for API bugs

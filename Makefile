@@ -1,23 +1,27 @@
-.PHONY: help install run test docker-build docker-run docker-push clean
+.PHONY: help install run test docker-build docker-run docker-push clean download-models
 
 help:
-	@echo "Video Generator API - Available commands:"
+	@echo "Video Generator API (LTX-2) - Available commands:"
 	@echo ""
-	@echo "  make install        - Install Python dependencies"
-	@echo "  make run            - Run the API locally"
-	@echo "  make test           - Run tests"
-	@echo "  make examples       - Run usage examples"
-	@echo "  make docker-build   - Build Docker image"
-	@echo "  make docker-run     - Run Docker container"
-	@echo "  make docker-push    - Push Docker image to registry"
-	@echo "  make clean          - Clean generated files"
+	@echo "  make install            - Install Python dependencies"
+	@echo "  make run                - Run the API locally"
+	@echo "  make test               - Run tests"
+	@echo "  make examples           - Run usage examples"
+	@echo "  make docker-build       - Build Docker image"
+	@echo "  make docker-run         - Run Docker container (CPU)"
+	@echo "  make docker-run-gpu     - Run Docker container (GPU)"
+	@echo "  make docker-push        - Build and push Docker image"
+	@echo "  make docker-compose-up  - Start with Docker Compose"
+	@echo "  make docker-compose-down - Stop Docker Compose"
+	@echo "  make download-models    - Download LTX-2 models"
+	@echo "  make clean              - Clean generated files"
 	@echo ""
 
 install:
 	pip install -r requirements.txt
 
 run:
-	python main.py
+	PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True python main.py
 
 test:
 	python test_api.py
@@ -26,13 +30,13 @@ examples:
 	python examples.py
 
 docker-build:
-	docker build -t video-generator-api:latest .
+	./build_and_push.sh
 
 docker-run:
-	docker run -p 8000:8000 video-generator-api:latest
+	docker run -p 8000:8000 -v models-cache:/workspace/models video-generator-api:latest
 
 docker-run-gpu:
-	docker run --gpus all -p 8000:8000 video-generator-api:latest
+	docker run --gpus all -p 8000:8000 -v models-cache:/workspace/models video-generator-api:latest
 
 docker-compose-up:
 	docker-compose up -d
@@ -41,9 +45,10 @@ docker-compose-down:
 	docker-compose down
 
 docker-push:
-	@echo "Please tag and push manually:"
-	@echo "  docker tag video-generator-api:latest your-username/video-generator-api:latest"
-	@echo "  docker push your-username/video-generator-api:latest"
+	@echo "Usage: ./build_and_push.sh --push --username YOUR_DOCKER_USERNAME"
+	@echo ""
+	@echo "Or set DOCKER_USERNAME and run:"
+	@echo "  ./build_and_push.sh --push"
 
 clean:
 	rm -f *.mp4 *.avi *.mov

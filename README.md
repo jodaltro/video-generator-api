@@ -1,14 +1,15 @@
-# Video Generator API
+# Video Generator API (LTX-2)
 
-API para geração de vídeos a partir de texto usando o modelo LTX-Video da Lightricks.
+API para geração de vídeos a partir de texto usando o modelo **LTX-2** da Lightricks.
 
 ## 🎥 Características
 
-- **Endpoint único**: `/generate` - Gera vídeos a partir de texto
-- **Modelo moderno**: Usa LTX-Video (open-source) da Lightricks
-- **Download sob demanda**: Modelos são baixados na primeira execução (imagem Docker leve)
+- **Modelo LTX-2**: Usa o modelo de última geração LTX-2 (19B parâmetros) da Lightricks
+- **DistilledPipeline**: Pipeline otimizado para inferência rápida (8 sigmas predefinidos)
+- **FP8 Support**: Suporte a FP8 para menor uso de memória VRAM
+- **Download sob demanda**: Modelos baixados na primeira execução via script
 - **Documentação Swagger**: Interface interativa em `/` (raiz)
-- **Pronto para RunPod**: Otimizado para deployment em pods GPU
+- **Pronto para RunPod/Pod GPU**: Otimizado para deployment em pods GPU
 
 ## 🚀 Início Rápido
 
@@ -16,20 +17,50 @@ API para geração de vídeos a partir de texto usando o modelo LTX-Video da Lig
 
 ```bash
 # Build da imagem
-docker build -t video-generator-api .
+./build_and_push.sh
 
-# Run do container
-docker run -p 8000:8000 video-generator-api
+# Baixar modelos (primeira vez - ~30 GB)
+docker run --gpus all -v models-cache:/workspace/models video-generator-api:latest python download_models.py
+
+# Executar a API
+docker run --gpus all -p 8000:8000 -v models-cache:/workspace/models video-generator-api:latest
 ```
 
-### Opção 2: Local (Python)
+### Opção 2: Build e Push para Docker Hub
 
 ```bash
-# Instalar dependências
-pip install -r requirements.txt
+# Build e push
+./build_and_push.sh --push --username seu-usuario
 
-# Executar API
-python main.py
+# Ou com tag específica
+./build_and_push.sh --push --username seu-usuario --tag v2.0
+```
+
+### Opção 3: Docker Compose
+
+```bash
+docker-compose up -d
+```
+
+## 📦 Modelos Necessários (LTX-2)
+
+O script `download_models.py` baixa automaticamente os seguintes modelos do HuggingFace:
+
+| Modelo | Descrição | Tamanho |
+|--------|-----------|---------|
+| `ltx-2-19b-distilled-fp8.safetensors` | Checkpoint LTX-2 (distilled FP8) | ~10 GB |
+| `ltx-2-spatial-upscaler-x2-1.0.safetensors` | Upscaler espacial 2x | ~2 GB |
+| `ltx-2-19b-distilled-lora-384.safetensors` | LoRA destilado | ~1 GB |
+| `gemma-3-12b-it-qat-q4_0-unquantized/` | Encoder de texto Gemma 3 | ~15 GB |
+
+### Download Manual
+
+```bash
+# Usando o script
+python download_models.py
+
+# Ou dentro do container
+docker run --gpus all -v models-cache:/workspace/models video-generator-api:latest python download_models.py
 ```
 
 ## 📡 API Endpoints
@@ -48,8 +79,8 @@ Gera um vídeo a partir de uma descrição em texto.
   "duration": 3.0,
   "fps": 25,
   "width": 512,
-  "height": 512,
-  "num_inference_steps": 30,
+  "height": 768,
+  "num_inference_steps": 40,
   "guidance_scale": 3.0,
   "seed": 42
 }
@@ -63,9 +94,9 @@ Gera um vídeo a partir de uma descrição em texto.
 | `duration` | float | Não | 3.0 | Duração em segundos (1-10) |
 | `num_frames` | int | Não | auto | Número de frames (8-257) |
 | `fps` | int | Não | 25 | Frames por segundo (8-60) |
-| `width` | int | Não | 512 | Largura em pixels (256-1024, divisível por 8) |
-| `height` | int | Não | 512 | Altura em pixels (256-1024, divisível por 8) |
-| `num_inference_steps` | int | Não | 30 | Steps de denoising (10-100) |
+| `width` | int | Não | 512 | Largura em pixels (256-1280, divisível por 8) |
+| `height` | int | Não | 768 | Altura em pixels (256-1280, divisível por 8) |
+| `num_inference_steps` | int | Não | 40 | Steps de denoising (4-100) |
 | `guidance_scale` | float | Não | 3.0 | Força de aderência ao prompt (1-20) |
 | `seed` | int | Não | random | Seed para reprodutibilidade |
 
@@ -83,7 +114,9 @@ Verifica o status da API e se o modelo está carregado.
 {
   "status": "healthy",
   "model_loaded": true,
-  "message": "Video Generator API is running"
+  "device": "cuda",
+  "models_dir": "/workspace/models",
+  "message": "Video Generator API (LTX-2) is running"
 }
 ```
 
@@ -94,60 +127,90 @@ Acesse a documentação interativa:
 - **Swagger UI**: http://localhost:8000/
 - **ReDoc**: http://localhost:8000/redoc
 
-## 🐳 Docker Hub
+## 🐳 Build e Push Local
 
-### Build e Push
+O projeto usa um script de build local (sem GitHub Actions):
 
 ```bash
-# Build
-docker build -t seu-usuario/video-generator-api:latest .
+# Apenas build
+./build_and_push.sh
 
-# Tag
-docker tag video-generator-api seu-usuario/video-generator-api:latest
+# Build e push
+./build_and_push.sh --push --username seu-usuario
 
-# Push
-docker push seu-usuario/video-generator-api:latest
+# Build com tag e push
+./build_and_push.sh --push --username seu-usuario --tag v2.0
+
+# Ver opções
+./build_and_push.sh --help
 ```
 
-## ☁️ Deployment no RunPod
+## ☁️ Deployment em Pod GPU (RunPod)
 
-### 1. Configuração do Pod
+### 1. Build e Push
+
+```bash
+./build_and_push.sh --push --username seu-usuario
+```
+
+### 2. Configuração do Pod
 
 - **Imagem Docker**: `seu-usuario/video-generator-api:latest`
-- **GPU**: Recomendado NVIDIA A40 ou superior
+- **GPU**: Recomendado NVIDIA A40 ou superior (48GB+ VRAM)
 - **Porta**: 8000
-- **Volumes**: Opcional - montar volume para cache de modelos
+- **Volume**: Montar volume em `/workspace/models`
 
-### 2. Variáveis de Ambiente
+### 3. Variáveis de Ambiente
 
 ```bash
 PORT=8000
-HF_HOME=/workspace/.cache/huggingface
+MODELS_DIR=/workspace/models
+PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 ```
 
-### 3. Primeira Execução
+### 4. Primeira Execução
 
-Na primeira execução, o pod irá:
-1. Baixar os modelos LTX-Video do HuggingFace (~10-15 GB)
-2. Cachear os modelos no volume (se configurado)
-3. Estar pronto para gerar vídeos
+Na primeira execução, execute dentro do pod:
+```bash
+python download_models.py
+```
 
-**Tempo estimado da primeira execução**: 10-20 minutos (dependendo da velocidade da rede)
+Isso irá baixar:
+1. Checkpoint LTX-2 (~10 GB)
+2. Spatial Upscaler (~2 GB)
+3. Distilled LoRA (~1 GB)
+4. Gemma 3 Text Encoder (~15 GB)
+
+**Tempo estimado**: 10-30 minutos dependendo da velocidade da rede.
 
 ## 🔧 Configuração Avançada
 
-### Otimizações de Memória
+### Escolha de Checkpoint
 
-Para GPUs com menos VRAM, o código já inclui:
-- `enable_model_cpu_offload()`: Offload automático para CPU
-- `enable_vae_slicing()`: Reduz uso de memória do VAE
+O LTX-2 oferece várias opções de checkpoint:
 
-### Cache de Modelos
+| Checkpoint | Descrição | VRAM |
+|------------|-----------|------|
+| `ltx-2-19b-distilled-fp8` | Mais rápido, menor memória (padrão) | ~20 GB |
+| `ltx-2-19b-distilled` | Rápido, FP32 | ~40 GB |
+| `ltx-2-19b-dev-fp8` | Maior qualidade, FP8 | ~20 GB |
+| `ltx-2-19b-dev` | Maior qualidade, FP32 | ~40 GB |
 
-Os modelos são baixados para:
-- Local: `~/.cache/huggingface/`
-- Docker: `/root/.cache/huggingface/`
-- RunPod: `/workspace/.cache/huggingface/` (configurável)
+Para trocar o checkpoint, altere a variável `LTX2_CHECKPOINT` no `.env`.
+
+### Estrutura dos Modelos
+
+```
+/workspace/models/
+├── ltx-2-19b-distilled-fp8.safetensors
+├── ltx-2-spatial-upscaler-x2-1.0.safetensors
+├── ltx-2-19b-distilled-lora-384.safetensors
+└── gemma-3-12b-it-qat-q4_0-unquantized/
+    ├── config.json
+    ├── model.safetensors
+    ├── tokenizer.json
+    └── ...
+```
 
 ## 📝 Exemplos de Uso
 
@@ -157,12 +220,12 @@ Os modelos são baixados para:
 curl -X POST "http://localhost:8000/generate" \
   -H "Content-Type: application/json" \
   -d '{
-    "prompt": "A cat playing with a ball of yarn",
+    "prompt": "A cat playing with a ball of yarn in a cozy living room, warm afternoon light streaming through the window",
     "duration": 3.0,
     "fps": 25,
     "width": 512,
-    "height": 512,
-    "num_inference_steps": 30,
+    "height": 768,
+    "num_inference_steps": 40,
     "guidance_scale": 3.0
   }' \
   --output video.mp4
@@ -176,12 +239,12 @@ import requests
 response = requests.post(
     "http://localhost:8000/generate",
     json={
-        "prompt": "A cat playing with a ball of yarn",
+        "prompt": "A cat playing with a ball of yarn in a cozy living room",
         "duration": 3.0,
         "fps": 25,
         "width": 512,
-        "height": 512,
-        "num_inference_steps": 30,
+        "height": 768,
+        "num_inference_steps": 40,
         "guidance_scale": 3.0
     }
 )
@@ -190,84 +253,48 @@ with open("video.mp4", "wb") as f:
     f.write(response.content)
 ```
 
-### JavaScript (Node.js)
-
-```javascript
-const fs = require('fs');
-const axios = require('axios');
-
-async function generateVideo() {
-  const response = await axios.post(
-    'http://localhost:8000/generate',
-    {
-      prompt: 'A cat playing with a ball of yarn',
-      duration: 3.0,
-      fps: 25,
-      width: 512,
-      height: 512,
-      num_inference_steps: 30,
-      guidance_scale: 3.0
-    },
-    { responseType: 'arraybuffer' }
-  );
-  
-  fs.writeFileSync('video.mp4', response.data);
-}
-
-generateVideo();
-```
-
 ## ⚙️ Requisitos de Sistema
 
 ### Mínimo
 
-- **CPU**: 4 cores
-- **RAM**: 16 GB
-- **GPU**: NVIDIA com 8 GB VRAM (opcional, mas recomendado)
-- **Storage**: 20 GB (para modelos e cache)
+- **GPU**: NVIDIA com 24 GB VRAM (RTX 3090/4090)
+- **RAM**: 32 GB
+- **Storage**: 50 GB (para modelos)
+- **CUDA**: 12.1+
 
-### Recomendado (RunPod)
+### Recomendado (RunPod/Pod)
 
-- **GPU**: NVIDIA A40, A100, ou RTX 4090
-- **RAM**: 32 GB+
-- **Storage**: 50 GB SSD
+- **GPU**: NVIDIA A40 (48 GB) ou A100 (80 GB)
+- **RAM**: 64 GB+
+- **Storage**: 100 GB SSD
 
 ## 🐛 Troubleshooting
 
 ### Erro: "CUDA out of memory"
 
-Reduza os parâmetros:
-- `width` e `height`: tente 256x256
-- `num_frames`: reduza para 40-60
-- `num_inference_steps`: reduza para 20
+- Use checkpoint FP8 (`ltx-2-19b-distilled-fp8`)
+- Reduza resolução: tente 384x512
+- Reduza `num_frames`: 60-80
 
-### Modelo não carrega
+### Modelos não encontrados
 
-Verifique:
-1. Conexão com internet (primeira execução)
-2. Espaço em disco disponível (mínimo 20 GB)
-3. Logs do container: `docker logs <container-id>`
+```bash
+# Baixe os modelos primeiro
+python download_models.py
+```
 
-### Vídeos muito lentos para gerar
+### Vídeos muito lentos
 
-- Use GPU (tempo: ~1-2 min com A40)
-- CPU será muito lento (tempo: ~20-30 min)
+- Certifique-se de usar GPU NVIDIA com CUDA
+- Use a DistilledPipeline (padrão) para inferência mais rápida
+- Use `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`
 
 ## 📄 Licença
 
 Este projeto usa:
-- **LTX-Video**: Apache 2.0 License (Lightricks)
+- **LTX-2**: Apache 2.0 License (Lightricks)
+- **Gemma 3**: Google Terms of Service
 - **FastAPI**: MIT License
-- **Diffusers**: Apache 2.0 License
-
-## 🤝 Contribuindo
-
-Contribuições são bem-vindas! Por favor:
-1. Fork o projeto
-2. Crie uma branch para sua feature
-3. Commit suas mudanças
-4. Push para a branch
-5. Abra um Pull Request
 
 ## 📞 Suporte
 

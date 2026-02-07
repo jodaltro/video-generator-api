@@ -7,10 +7,11 @@ services:
       - "8000:8000"
     environment:
       - PORT=8000
-      - HF_HOME=/app/.cache/huggingface
+      - MODELS_DIR=/workspace/models
+      - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
     volumes:
-      # Mount cache directory to persist models between restarts
-      - huggingface-cache:/app/.cache/huggingface
+      # Persist models across restarts
+      - models-cache:/workspace/models
     deploy:
       resources:
         reservations:
@@ -21,4 +22,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  huggingface-cache:
+  models-cache:
