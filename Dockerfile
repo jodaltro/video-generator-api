@@ -35,7 +35,7 @@ RUN python -m pip install --no-cache-dir --upgrade pip
 WORKDIR /app
 
 # Install PyTorch with CUDA support
-RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cu121
+RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
 # Clone LTX-2 repository and install its packages
 RUN git clone https://github.com/Lightricks/LTX-2.git /opt/LTX-2 && \
