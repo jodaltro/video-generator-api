@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 LTX2_REPO_ID = "Lightricks/LTX-2"
 GEMMA_REPO_ID = "google/gemma-3-12b-it-qat-q4_0-unquantized"
+# Base Gemma repo for downloading tokenizer.model (SentencePiece) if missing from QAT variant
+GEMMA_BASE_REPO_ID = "google/gemma-3-12b-it"
 
 # LTX-2 model files to download
 LTX2_FILES = [
@@ -154,6 +156,28 @@ def download_models():
                 f"({_format_size(size)}, took {_format_duration(elapsed)})"
             )
             downloaded_count += 1
+
+        # Ensure tokenizer.model (SentencePiece) exists in the Gemma directory.
+        # The QAT variant may not include it, so download from the base Gemma repo.
+        tokenizer_model_path = os.path.join(gemma_dir, "tokenizer.model")
+        if not os.path.exists(tokenizer_model_path):
+            logger.info(
+                "⬇️  DOWNLOADING tokenizer.model from "
+                f"{GEMMA_BASE_REPO_ID} (required by LTX-2 text encoder)..."
+            )
+            file_start = time.time()
+            hf_hub_download(
+                repo_id=GEMMA_BASE_REPO_ID,
+                filename="tokenizer.model",
+                local_dir=gemma_dir,
+                local_dir_use_symlinks=False,
+            )
+            elapsed = time.time() - file_start
+            logger.info(
+                f"✅ DONE tokenizer.model (took {_format_duration(elapsed)})"
+            )
+        else:
+            logger.info("✅ tokenizer.model already present")
 
         total_elapsed = time.time() - total_start
 

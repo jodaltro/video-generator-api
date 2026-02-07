@@ -64,6 +64,14 @@ class VideoGenerator:
             missing.append(f"Spatial upsampler: {self.spatial_upsampler_path}")
         if not os.path.isdir(self.gemma_root):
             missing.append(f"Gemma encoder directory: {self.gemma_root}")
+        else:
+            # LTX-2 text encoder requires tokenizer.model (SentencePiece format)
+            tokenizer_model = os.path.join(self.gemma_root, "tokenizer.model")
+            if not os.path.exists(tokenizer_model):
+                missing.append(
+                    f"Gemma tokenizer.model (SentencePiece): {tokenizer_model} "
+                    "(the QAT model variant may not include this file)"
+                )
         if missing:
             msg = "Missing model files:\n" + "\n".join(f"  - {m}" for m in missing)
             msg += "\n\nRun 'python download_models.py' to download them."

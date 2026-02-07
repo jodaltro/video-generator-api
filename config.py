@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     # HuggingFace repo for downloading models
     hf_repo_id: str = "Lightricks/LTX-2"
     hf_gemma_repo_id: str = "google/gemma-3-12b-it-qat-q4_0-unquantized"
+    # Base (non-QAT) Gemma repo for tokenizer.model, which the QAT variant may lack
+    hf_gemma_base_repo_id: str = "google/gemma-3-12b-it"
 
     # Generation Defaults
     default_fps: int = 25
