@@ -157,27 +157,40 @@ def download_models():
             )
             downloaded_count += 1
 
-        # Ensure tokenizer.model (SentencePiece) exists in the Gemma directory.
-        # The QAT variant may not include it, so download from the base Gemma repo.
-        tokenizer_model_path = os.path.join(gemma_dir, "tokenizer.model")
-        if not os.path.exists(tokenizer_model_path):
-            logger.info(
-                "⬇️  DOWNLOADING tokenizer.model from "
-                f"{GEMMA_BASE_REPO_ID} (required by LTX-2 text encoder)..."
-            )
-            file_start = time.time()
-            hf_hub_download(
-                repo_id=GEMMA_BASE_REPO_ID,
-                filename="tokenizer.model",
-                local_dir=gemma_dir,
-                local_dir_use_symlinks=False,
-            )
-            elapsed = time.time() - file_start
-            logger.info(
-                f"✅ DONE tokenizer.model (took {_format_duration(elapsed)})"
-            )
-        else:
-            logger.info("✅ tokenizer.model already present")
+        # Ensure all required configuration files exist in the Gemma directory.
+        # The QAT variant may not include these files, so download from the base Gemma repo.
+        required_files = [
+            "tokenizer.model",           # SentencePiece tokenizer model
+            "preprocessor_config.json",  # Preprocessor configuration (required by transformers)
+            "tokenizer_config.json",     # Tokenizer configuration
+            "special_tokens_map.json",   # Special tokens mapping
+        ]
+
+        for filename in required_files:
+            file_path = os.path.join(gemma_dir, filename)
+            if not os.path.exists(file_path):
+                logger.info(
+                    f"⬇️  DOWNLOADING {filename} from "
+                    f"{GEMMA_BASE_REPO_ID} (required by LTX-2 text encoder)..."
+                )
+                file_start = time.time()
+                try:
+                    hf_hub_download(
+                        repo_id=GEMMA_BASE_REPO_ID,
+                        filename=filename,
+                        local_dir=gemma_dir,
+                        local_dir_use_symlinks=False,
+                    )
+                    elapsed = time.time() - file_start
+                    logger.info(
+                        f"✅ DONE {filename} (took {_format_duration(elapsed)})"
+                    )
+                except Exception as e:
+                    # Handle download failures gracefully - special_tokens_map.json may be optional
+                    # for some models, but preprocessor_config.json and tokenizer files are critical
+                    logger.warning(f"⚠️  Could not download {filename}: {str(e)}")
+            else:
+                logger.info(f"✅ {filename} already present")
 
         total_elapsed = time.time() - total_start
 
