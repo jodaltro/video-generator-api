@@ -111,6 +111,8 @@ class VideoGenerationRequest(BaseModel):
 
 class HealthResponse(BaseModel):
     """Response model for health check"""
+    model_config = {"protected_namespaces": ()}
+    
     status: str
     model_loaded: bool
     device: str
