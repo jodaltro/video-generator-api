@@ -136,6 +136,9 @@ class VideoGenerator:
             Path to generated MP4 file
         """
         import tempfile
+        from ltx_pipelines.utils.media_io import encode_video
+        from ltx_pipelines.utils.constants import AUDIO_SAMPLE_RATE
+        from ltx_core.model.video_vae import TilingConfig, get_video_chunks_number
 
         # Load model if not already loaded
         self._load_model()
@@ -153,14 +156,30 @@ class VideoGenerator:
         os.close(fd)
 
         # Generate video using LTX-2 DistilledPipeline
-        self.pipeline(
+        # DistilledPipeline returns (video_tensor, audio_tensor) instead of writing to file
+        tiling_config = TilingConfig.default()
+        video_chunks_number = get_video_chunks_number(num_frames, tiling_config)
+
+        video, audio = self.pipeline(
             prompt=prompt,
-            output_path=output_path,
             seed=seed,
             height=height,
             width=width,
             num_frames=num_frames,
             frame_rate=float(fps),
+            images=[],  # No image conditioning
+            tiling_config=tiling_config,
+            enhance_prompt=False,
+        )
+
+        # Encode the video and audio to output file
+        encode_video(
+            video=video,
+            fps=fps,
+            audio=audio,
+            audio_sample_rate=AUDIO_SAMPLE_RATE,
+            output_path=output_path,
+            video_chunks_number=video_chunks_number,
         )
 
         logger.info(f"Video generated: {output_path}")
