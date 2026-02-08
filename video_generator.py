@@ -22,6 +22,8 @@ class VideoGenerator:
         gemma_root: str,
         distilled_lora_path: Optional[str] = None,
         enable_fp8: bool = True,
+        enable_cpu_offload: bool = False,
+        clear_cache_before_generation: bool = True,
     ):
         """
         Initialize the video generator with LTX-2 model paths.
@@ -38,9 +40,16 @@ class VideoGenerator:
         self.gemma_root = gemma_root
         self.distilled_lora_path = distilled_lora_path
         self.enable_fp8 = enable_fp8
+        self.enable_cpu_offload = enable_cpu_offload
+        self.clear_cache_before_generation = clear_cache_before_generation
         self.pipeline = None
         self.device = self._get_device()
         logger.info(f"VideoGenerator initialized with device: {self.device}")
+        logger.info(f"CPU offload: {enable_cpu_offload}, Clear cache: {clear_cache_before_generation}")
+        
+        # Set PyTorch memory allocation config for better memory management
+        if self.device == "cuda":
+            os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
     def _get_device(self) -> str:
         """Determine the best available device"""
@@ -50,6 +59,30 @@ class VideoGenerator:
             return "mps"
         else:
             return "cpu"
+    
+    def _log_gpu_memory(self, stage: str = ""):
+        """Log GPU memory usage"""
+        if self.device == "cuda" and torch.cuda.is_available():
+            allocated = torch.cuda.memory_allocated() / (1024**3)
+            reserved = torch.cuda.memory_reserved() / (1024**3)
+            total = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+            free = total - allocated
+            logger.info(
+                f"GPU Memory {stage}: "
+                f"Allocated: {allocated:.2f}GB, "
+                f"Reserved: {reserved:.2f}GB, "
+                f"Free: {free:.2f}GB, "
+                f"Total: {total:.2f}GB"
+            )
+    
+    def _clear_gpu_cache(self):
+        """Clear GPU cache to free memory"""
+        if self.device == "cuda" and torch.cuda.is_available():
+            logger.info("Clearing GPU cache...")
+            self._log_gpu_memory("before clear")
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+            self._log_gpu_memory("after clear")
 
     def is_loaded(self) -> bool:
         """Check if the model is loaded"""
@@ -140,8 +173,14 @@ class VideoGenerator:
         from ltx_pipelines.utils.constants import AUDIO_SAMPLE_RATE
         from ltx_core.model.video_vae import TilingConfig, get_video_chunks_number
 
+        # Clear GPU cache before generation if enabled
+        if self.clear_cache_before_generation:
+            self._clear_gpu_cache()
+        
         # Load model if not already loaded
         self._load_model()
+        
+        self._log_gpu_memory("after model load")
 
         if seed is None:
             seed = torch.randint(0, 2**32, (1,)).item()

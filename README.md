@@ -7,9 +7,18 @@ API para geração de vídeos a partir de texto usando o modelo **LTX-2** da Lig
 - **Modelo LTX-2**: Usa o modelo de última geração LTX-2 (19B parâmetros) da Lightricks
 - **DistilledPipeline**: Pipeline otimizado para inferência rápida (8 sigmas predefinidos)
 - **FP8 Support**: Suporte a FP8 para menor uso de memória VRAM
+- **Gerenciamento de Memória**: Cache clearing automático e fragmentação reduzida
+- **CPU Offloading**: Opção para offload de modelos para CPU (para GPUs com memória limitada)
 - **Download automático**: Modelos baixados automaticamente na primeira inicialização do pod
 - **Documentação Swagger**: Interface interativa em `/` (raiz)
 - **Pronto para RunPod/Pod GPU**: Otimizado para deployment em pods GPU
+
+## ⚠️ Requisitos de GPU
+
+- **Mínimo**: 16GB VRAM (com CPU offload e resoluções menores)
+- **Recomendado**: 24GB+ VRAM (para vídeos em resolução completa)
+
+> 💡 **Problemas com CUDA Out of Memory?** Veja o guia completo: [MEMORY_OPTIMIZATION.md](MEMORY_OPTIMIZATION.md)
 
 ## 🚀 Início Rápido
 
@@ -241,10 +250,10 @@ curl -X POST "http://localhost:8000/generate" \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "A cat playing with a ball of yarn in a cozy living room, warm afternoon light streaming through the window",
-    "duration": 3.0,
+    "duration": 2.0,
     "fps": 25,
-    "width": 512,
-    "height": 768,
+    "width": 384,
+    "height": 576,
     "num_inference_steps": 40,
     "guidance_scale": 3.0
   }' \
@@ -260,10 +269,10 @@ response = requests.post(
     "http://localhost:8000/generate",
     json={
         "prompt": "A cat playing with a ball of yarn in a cozy living room",
-        "duration": 3.0,
+        "duration": 2.0,
         "fps": 25,
-        "width": 512,
-        "height": 768,
+        "width": 384,
+        "height": 576,
         "num_inference_steps": 40,
         "guidance_scale": 3.0
     }

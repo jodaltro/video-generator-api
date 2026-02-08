@@ -40,18 +40,18 @@ class VideoGenerationRequest(BaseModel):
         examples=["A serene sunset over the ocean with waves gently rolling"]
     )
     duration: float = Field(
-        default=3.0,
+        default=2.0,
         ge=1.0,
         le=10.0,
-        description="Duration of the video in seconds (1-10)",
-        examples=[3.0]
+        description="Duration of the video in seconds (1-10). Shorter videos use less memory.",
+        examples=[2.0]
     )
     num_frames: Optional[int] = Field(
         default=None,
         ge=8,
         le=257,
-        description="Number of frames to generate (8-257). If not specified, calculated from duration and fps",
-        examples=[121]
+        description="Number of frames to generate (8-257). If not specified, calculated from duration and fps. Fewer frames use less memory.",
+        examples=[49]
     )
     fps: int = Field(
         default=25,
@@ -61,18 +61,18 @@ class VideoGenerationRequest(BaseModel):
         examples=[25]
     )
     width: int = Field(
-        default=512,
+        default=384,
         ge=256,
         le=1280,
-        description="Video width in pixels (256-1280, must be divisible by 8)",
-        examples=[512]
+        description="Video width in pixels (256-1280, must be divisible by 8). Lower resolution uses less memory.",
+        examples=[384]
     )
     height: int = Field(
-        default=768,
+        default=576,
         ge=256,
         le=1280,
-        description="Video height in pixels (256-1280, must be divisible by 8)",
-        examples=[768]
+        description="Video height in pixels (256-1280, must be divisible by 8). Lower resolution uses less memory.",
+        examples=[576]
     )
     num_inference_steps: int = Field(
         default=40,
@@ -98,10 +98,10 @@ class VideoGenerationRequest(BaseModel):
         json_schema_extra = {
             "example": {
                 "prompt": "A serene sunset over the ocean with waves gently rolling",
-                "duration": 3.0,
+                "duration": 2.0,
                 "fps": 25,
-                "width": 512,
-                "height": 768,
+                "width": 384,
+                "height": 576,
                 "num_inference_steps": 40,
                 "guidance_scale": 3.0,
                 "seed": 42
@@ -131,6 +131,8 @@ def get_video_generator() -> VideoGenerator:
             gemma_root=settings.gemma_root_path,
             distilled_lora_path=settings.distilled_lora_path,
             enable_fp8=settings.enable_fp8,
+            enable_cpu_offload=settings.enable_cpu_offload,
+            clear_cache_before_generation=settings.clear_cache_before_generation,
         )
     return video_generator
 

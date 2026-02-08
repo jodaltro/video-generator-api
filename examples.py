@@ -18,9 +18,9 @@ def example_basic_generation():
 
     payload = {
         "prompt": "A beautiful sunset over mountains with birds flying across the golden sky, warm light illuminating the peaks",
-        "duration": 3.0,
-        "width": 512,
-        "height": 768,
+        "duration": 2.0,
+        "width": 384,
+        "height": 576,
     }
 
     print(f"\nRequest payload:")
@@ -56,8 +56,8 @@ def example_custom_parameters():
         "prompt": "A cat playing with a ball of yarn in a cozy living room, soft afternoon light streaming through the window, the cat pounces and rolls with the yarn",
         "duration": 2.0,
         "fps": 25,
-        "width": 512,
-        "height": 768,
+        "width": 384,
+        "height": 576,
         "num_inference_steps": 40,
         "guidance_scale": 4.0,
         "seed": 12345  # For reproducibility
@@ -104,8 +104,8 @@ def example_multiple_videos():
         payload = {
             "prompt": prompt,
             "duration": 2.0,
-            "width": 512,
-            "height": 768,
+            "width": 384,
+            "height": 576,
             "num_inference_steps": 40
         }
 
