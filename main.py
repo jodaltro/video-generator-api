@@ -132,6 +132,7 @@ def get_video_generator() -> VideoGenerator:
             distilled_lora_path=settings.distilled_lora_path,
             enable_fp8=settings.enable_fp8,
             enable_cpu_offload=settings.enable_cpu_offload,
+            enable_aggressive_offload=settings.enable_aggressive_offload,
             clear_cache_before_generation=settings.clear_cache_before_generation,
         )
     return video_generator

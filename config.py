@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     # Performance Settings
     enable_fp8: bool = True
     enable_cpu_offload: bool = os.getenv("ENABLE_CPU_OFFLOAD", "false").lower() == "true"
+    enable_aggressive_offload: bool = os.getenv("ENABLE_AGGRESSIVE_OFFLOAD", "true").lower() == "true"
     clear_cache_before_generation: bool = True
 
     class Config:
