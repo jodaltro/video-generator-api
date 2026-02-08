@@ -165,7 +165,7 @@ def download_models():
             "tokenizer_config.json",     # Tokenizer configuration
             "special_tokens_map.json",   # Special tokens mapping
         ]
-        
+
         for filename in required_files:
             file_path = os.path.join(gemma_dir, filename)
             if not os.path.exists(file_path):
@@ -186,7 +186,8 @@ def download_models():
                         f"✅ DONE {filename} (took {_format_duration(elapsed)})"
                     )
                 except Exception as e:
-                    # Some files might be optional, log but continue
+                    # Handle download failures gracefully - special_tokens_map.json may be optional
+                    # for some models, but preprocessor_config.json and tokenizer files are critical
                     logger.warning(f"⚠️  Could not download {filename}: {str(e)}")
             else:
                 logger.info(f"✅ {filename} already present")
