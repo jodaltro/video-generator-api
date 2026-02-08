@@ -159,7 +159,7 @@ class VideoGenerator:
         # DistilledPipeline returns (video_tensor, audio_tensor) instead of writing to file
         tiling_config = TilingConfig.default()
         video_chunks_number = get_video_chunks_number(num_frames, tiling_config)
-        
+
         video, audio = self.pipeline(
             prompt=prompt,
             seed=seed,
