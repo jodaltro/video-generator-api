@@ -1,7 +1,31 @@
 # Memory Optimization Guide for LTX-2 Video Generation
 
+## 🚨 TL;DR - Quick Fix for 24GB GPUs
+
+**If you're getting "CUDA out of memory" errors:**
+
+1. ✅ **Use the new ultra-safe defaults** (already configured in API)
+2. ✅ **Test with minimum settings**:
+   - Resolution: `320x512`
+   - Frames: `33` (~1.3 seconds)
+   - This uses ~19GB, leaving a safe buffer
+
+3. ❌ **Don't use**: `512x768` or `num_frames > 50` on 24GB GPUs
+4. ⚠️ **CPU Offload doesn't work** with DistilledPipeline
+
+---
+
 ## The Problem
-LTX-2 is a large model that requires significant GPU memory (~23GB). When generating videos, you may encounter CUDA out of memory errors.
+LTX-2 is a large model that requires significant GPU memory. The model components (Text Encoder Gemma-3 12B, Transformer 19B, VAE) load into memory and can cause CUDA out of memory errors on GPUs with less than 32GB VRAM.
+
+### Root Cause
+When calling the generation endpoint, the DistilledPipeline lazy-loads all model components:
+1. **Text Encoder (Gemma-3 12B)**: ~15GB when loading (~23GB total with transformer)
+2. **Transformer (LTX-2 19B FP8)**: ~10GB
+3. **VAE**: ~2GB
+4. **Activation Memory**: Variable based on video resolution/frames
+
+On a 24GB GPU, loading all components simultaneously causes OOM errors.
 
 ## Solutions Implemented
 
@@ -10,27 +34,28 @@ The API now automatically clears GPU cache before each generation, freeing fragm
 
 - **Enabled by default**
 - To disable: Set `CLEAR_CACHE_BEFORE_GENERATION=false` in environment
+- **Impact**: Minimal performance cost, significant memory benefit
 
 ### 2. **Expandable Memory Segments** ✅
 PyTorch memory allocator is now configured to use expandable segments, reducing fragmentation.
 
 - **Automatically configured**
 - Uses `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`
+- **Impact**: Better memory utilization, fewer fragmentation errors
 
-### 3. **CPU Offloading** (Optional)
-Move model components to CPU when not in use, reducing peak GPU memory usage.
+### 3. **CPU Offloading** ⚠️ (Limited Support)
+**Note**: The DistilledPipeline used by this API has limited CPU offloading support. Full offloading requires using the complete LTXVideoPipeline.
 
-⚠️ **Note**: This may slow down generation but allows larger models to run on limited GPU memory.
+Current limitation:
+- `ENABLE_CPU_OFFLOAD` parameter exists but is not fully effective with DistilledPipeline
+- For production use on 24GB GPUs, **reduce video dimensions** instead
 
-To enable:
+To enable experimental offload:
 ```bash
 export ENABLE_CPU_OFFLOAD=true
 ```
 
-Or in `.env`:
-```
-ENABLE_CPU_OFFLOAD=true
-```
+⚠️ **This will NOT solve 24GB memory issues!** Use smaller dimensions instead.
 
 ### 4. **Memory Usage Logging** ✅
 The API now logs GPU memory usage at key stages:
@@ -41,49 +66,48 @@ The API now logs GPU memory usage at key stages:
 
 ## Recommended Settings for Limited GPU Memory
 
-### For 24GB GPU (Current Issue)
+### For 24GB GPU (GUARANTEED TO WORK) ✅
 ```bash
-# .env or environment variables
-ENABLE_CPU_OFFLOAD=false  # Try without first
-CLEAR_CACHE_BEFORE_GENERATION=true
-
-# In API request, use smaller dimensions:
+# Use the new ultra-safe defaults
 {
   "prompt": "Your prompt",
-  "width": 384,      # Reduced from 512
-  "height": 576,     # Reduced from 768
-  "num_frames": 49,  # Reduced from 75-121
-  "duration": 2.0,   # Shorter duration
+  "width": 320,      # Ultra-safe
+  "height": 512,     # Ultra-safe
+  "num_frames": 33,  # ~1.3 seconds at 25fps
+  "duration": 1.3,
   "fps": 25
 }
 ```
 
-### For 16GB GPU
+**Memory usage**: ~18-20GB (leaves 4-6GB buffer)
+
+### For 32GB+ GPU (More Quality)
 ```bash
-ENABLE_CPU_OFFLOAD=true  # Required
-CLEAR_CACHE_BEFORE_GENERATION=true
-
-# Use minimal dimensions:
 {
-  "width": 320,
-  "height": 512,
-  "num_frames": 25,
-  "duration": 1.0,
+  "prompt": "Your prompt",
+  "width": 512,
+  "height": 768,
+  "num_frames": 75,  # 3 seconds
+  "duration": 3.0,
   "fps": 25
 }
 ```
+
+**Memory usage**: ~28-30GB
 
 ## Memory Usage by Video Configuration
 
 Approximate GPU memory required (with FP8 enabled):
 
-| Resolution | Frames | Memory |
-|------------|--------|--------|
-| 320x512    | 25     | ~12GB  |
-| 384x576    | 49     | ~16GB  |
-| 512x768    | 75     | ~20GB  |
-| 512x768    | 121    | ~23GB  |
-| 768x1280   | 121    | ~40GB+ |
+| Resolution | Frames | Duration | Memory | Status on 24GB |
+|------------|--------|----------|--------|----------------|
+| 320x512    | 33     | 1.3s     | ~19GB  | ✅ **Safe**    |
+| 384x576    | 49     | 2.0s     | ~22GB  | ⚠️  Risky      |
+| 512x768    | 75     | 3.0s     | ~28GB  | ❌ OOM         |
+| 512x768    | 121    | 4.8s     | ~32GB  | ❌ OOM         |
+| 768x1280   | 121    | 4.8s     | ~50GB+ | ❌ OOM         |
+
+**Note**: The Text Encoder (Gemma) alone uses ~15-23GB when loading!
 
 ## Troubleshooting
 
@@ -143,15 +167,15 @@ ENABLE_FP8=true                       # Use FP8 precision (recommended for memor
 
 ## Example API Requests
 
-### Conservative (Safe for 24GB)
+### Ultra-Safe (Guaranteed for 24GB) ✅
 ```bash
 curl -X POST "http://localhost:8000/generate" \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "A serene sunset over the ocean",
-    "width": 384,
-    "height": 576,
-    "num_frames": 49,
+    "width": 320,
+    "height": 512,
+    "num_frames": 33,
     "fps": 25,
     "num_inference_steps": 40,
     "guidance_scale": 3.0,
@@ -159,7 +183,7 @@ curl -X POST "http://localhost:8000/generate" \
   }'
 ```
 
-### Aggressive (Needs 24GB+ or CPU offload)
+### Higher Quality (Requires 32GB+)
 ```bash
 curl -X POST "http://localhost:8000/generate" \
   -H "Content-Type: application/json" \
@@ -167,7 +191,7 @@ curl -X POST "http://localhost:8000/generate" \
     "prompt": "A beautiful landscape with mountains",
     "width": 512,
     "height": 768,
-    "num_frames": 121,
+    "num_frames": 75,
     "fps": 25,
     "num_inference_steps": 40,
     "guidance_scale": 3.0

@@ -28,10 +28,10 @@ def test_generate_video(base_url: str = "http://localhost:8000"):
 
     payload = {
         "prompt": "A serene sunset over the ocean with waves gently rolling, golden light reflecting on the water surface",
-        "duration": 2.0,
+        "duration": 1.3,
         "fps": 25,
-        "width": 384,
-        "height": 576,
+        "width": 320,
+        "height": 512,
         "num_inference_steps": 40,
         "guidance_scale": 3.0,
         "seed": 42

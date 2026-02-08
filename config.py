@@ -35,11 +35,11 @@ class Settings(BaseSettings):
     # Base (non-QAT) Gemma repo for tokenizer.model, which the QAT variant may lack
     hf_gemma_base_repo_id: str = "google/gemma-3-12b-it"
 
-    # Generation Defaults (optimized for 24GB GPU)
+    # Generation Defaults (safe for 24GB GPU)
     default_fps: int = 25
-    default_width: int = 384
-    default_height: int = 576
-    default_num_frames: int = 49
+    default_width: int = 320
+    default_height: int = 512
+    default_num_frames: int = 33
     default_num_inference_steps: int = 40
     default_guidance_scale: float = 3.0
 

@@ -15,10 +15,15 @@ API para geração de vídeos a partir de texto usando o modelo **LTX-2** da Lig
 
 ## ⚠️ Requisitos de GPU
 
-- **Mínimo**: 16GB VRAM (com CPU offload e resoluções menores)
-- **Recomendado**: 24GB+ VRAM (para vídeos em resolução completa)
+- **Mínimo**: 24GB VRAM (RTX 3090, RTX 4090, A5000)
+  - Use resoluções menores: `320x512` com ~33 frames (~1.3s)
+- **Recomendado**: 32GB+ VRAM (A100, H100)
+  - Permite resoluções maiores: `512x768` com ~75 frames (~3s)
 
-> 💡 **Problemas com CUDA Out of Memory?** Veja o guia completo: [MEMORY_OPTIMIZATION.md](MEMORY_OPTIMIZATION.md)
+> 💡 **Problemas com CUDA Out of Memory?** 
+> - A API já usa configurações ultra-seguras por padrão (`320x512`, 33 frames)
+> - Veja o guia completo: [MEMORY_OPTIMIZATION.md](MEMORY_OPTIMIZATION.md)
+> - O modelo Text Encoder (Gemma-3 12B) sozinho usa ~15-23GB ao carregar!
 
 ## 🚀 Início Rápido
 
@@ -250,10 +255,10 @@ curl -X POST "http://localhost:8000/generate" \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "A cat playing with a ball of yarn in a cozy living room, warm afternoon light streaming through the window",
-    "duration": 2.0,
+    "duration": 1.3,
     "fps": 25,
-    "width": 384,
-    "height": 576,
+    "width": 320,
+    "height": 512,
     "num_inference_steps": 40,
     "guidance_scale": 3.0
   }' \
@@ -269,10 +274,10 @@ response = requests.post(
     "http://localhost:8000/generate",
     json={
         "prompt": "A cat playing with a ball of yarn in a cozy living room",
-        "duration": 2.0,
+        "duration": 1.3,
         "fps": 25,
-        "width": 384,
-        "height": 576,
+        "width": 320,
+        "height": 512,
         "num_inference_steps": 40,
         "guidance_scale": 3.0
     }

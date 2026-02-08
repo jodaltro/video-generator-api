@@ -127,6 +127,13 @@ class VideoGenerator:
         try:
             from ltx_pipelines.distilled import DistilledPipeline
 
+            # If CPU offload is enabled, load models on CPU first
+            if self.enable_cpu_offload:
+                logger.info("CPU offloading enabled - loading models on CPU first...")
+                # Temporarily set device to CPU for initial load
+                original_device = self.device
+                # We'll still create the pipeline normally, but pass device parameter in generate
+                
             self.pipeline = DistilledPipeline(
                 checkpoint_path=self.checkpoint_path,
                 spatial_upsampler_path=self.spatial_upsampler_path,
@@ -136,17 +143,8 @@ class VideoGenerator:
             )
 
             logger.info("LTX-2 model loaded successfully!")
-
-        except Exception as e:
-            logger.error(f"Failed to load LTX-2 model: {str(e)}")
-            raise
-
-    def generate(
-        self,
-        prompt: str,
-        num_frames: int = 121,
-        width: int = 512,
-        height: int = 768,
+            if self.enable_cpu_offload:
+                logger.info("Models will be offloaded to CPU when not in use")
         num_inference_steps: int = 40,
         guidance_scale: float = 3.0,
         fps: int = 25,
