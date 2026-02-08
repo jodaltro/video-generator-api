@@ -9,6 +9,10 @@ services:
       - PORT=8000
       - MODELS_DIR=/workspace/models
       - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+      # ⚠️ REQUIRED: HuggingFace token for gated models (Gemma 3)
+      # Get token at: https://huggingface.co/settings/tokens
+      # Request access: https://huggingface.co/google/gemma-3-12b-it
+      - HF_TOKEN=${HF_TOKEN:-}  # Set in .env file or via: HF_TOKEN=hf_xxx docker-compose up
     volumes:
       # Persist workspace data (models, dependencies marker) across restarts
       - workspace-data:/workspace

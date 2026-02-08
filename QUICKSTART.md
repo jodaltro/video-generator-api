@@ -1,5 +1,10 @@
 # Quick Start Guide (LTX-2)
 
+> ⚠️ **BEFORE YOU START**: You need a HuggingFace token to download the Gemma 3 model (gated):
+> 1. Request access: https://huggingface.co/google/gemma-3-12b-it
+> 2. Get token: https://huggingface.co/settings/tokens (Read permission)
+> 3. Set `HF_TOKEN=hf_xxxxxxxxxxxx` in your environment
+
 ## Docker Deployment (Recommended)
 
 ### 1. Build the Docker Image
@@ -12,6 +17,7 @@
 
 ```bash
 docker run --gpus all -p 8000:8000 \
+  -e HF_TOKEN=hf_xxxxxxxxxxxx \
   -v workspace-data:/workspace \
   -v pip-packages:/usr/local/lib/python3.10/dist-packages \
   -v pip-bin:/usr/local/bin \
@@ -61,11 +67,14 @@ curl -X POST "http://localhost:8000/generate" \
 ## Docker Compose
 
 ```bash
+# Set your HuggingFace token first
+export HF_TOKEN=hf_xxxxxxxxxxxx
+
 # Start the service
-docker-compose up
+HF_TOKEN=$HF_TOKEN docker-compose up
 
 # Or in detached mode
-docker-compose up -d
+HF_TOKEN=$HF_TOKEN docker-compose up -d
 
 # View logs
 docker-compose logs -f
@@ -73,6 +82,8 @@ docker-compose logs -f
 # Stop the service
 docker-compose down
 ```
+
+> **Tip**: Create a `.env` file (copy from `.env.example`) with your `HF_TOKEN` to avoid setting it each time.
 
 ## Important Notes
 

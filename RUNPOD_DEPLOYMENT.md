@@ -36,7 +36,15 @@ This guide explains how to deploy the Video Generator API with LTX-2 on RunPod w
      PORT=8000
      MODELS_DIR=/workspace/models
      PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+     HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
      ```
+   
+   > ⚠️ **IMPORTANTE - Token HuggingFace Obrigatório**:
+   > 
+   > O modelo Gemma 3 é **gated** e requer autenticação:
+   > 1. Solicite acesso: https://huggingface.co/google/gemma-3-12b-it
+   > 2. Crie um token: https://huggingface.co/settings/tokens (permissão "Read")
+   > 3. Adicione `HF_TOKEN` nas variáveis de ambiente acima
 
 ## Step 3: Deploy a Pod
 
@@ -130,6 +138,8 @@ For better quality:
 - Check RunPod logs for errors
 
 ### Model download fails
+- **Missing HF_TOKEN**: Check that you set the `HF_TOKEN` environment variable
+- **No access to Gemma**: Request access at https://huggingface.co/google/gemma-3-12b-it
 - Check internet connectivity
 - Verify disk space (need 50GB+)
 - Check HuggingFace Hub status

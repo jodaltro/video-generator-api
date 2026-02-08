@@ -80,6 +80,13 @@ def download_models():
     """Download all required LTX-2 models"""
     from huggingface_hub import hf_hub_download, snapshot_download
 
+    # Check for HuggingFace token (required for gated models like Gemma)
+    hf_token = os.getenv("HF_TOKEN") or os.getenv("HUGGING_FACE_HUB_TOKEN")
+    if not hf_token:
+        logger.warning("⚠️  No HF_TOKEN found. Gated models (like Gemma) will fail to download.")
+        logger.warning("   Get a token at: https://huggingface.co/settings/tokens")
+        logger.warning("   Request access to: https://huggingface.co/google/gemma-3-12b-it")
+    
     models_dir = os.getenv("MODELS_DIR", "/workspace/models")
     os.makedirs(models_dir, exist_ok=True)
 
@@ -119,6 +126,7 @@ def download_models():
                 filename=filename,
                 local_dir=models_dir,
                 local_dir_use_symlinks=False,
+                token=hf_token,
             )
             elapsed = time.time() - file_start
             size = os.path.getsize(dest_path)
@@ -148,6 +156,7 @@ def download_models():
                 repo_id=GEMMA_REPO_ID,
                 local_dir=gemma_dir,
                 local_dir_use_symlinks=False,
+                token=hf_token,
             )
             elapsed = time.time() - file_start
             size = _get_dir_size(gemma_dir) if os.path.exists(gemma_dir) else 0
@@ -180,6 +189,7 @@ def download_models():
                         filename=filename,
                         local_dir=gemma_dir,
                         local_dir_use_symlinks=False,
+                        token=hf_token,
                     )
                     elapsed = time.time() - file_start
                     logger.info(
@@ -230,7 +240,12 @@ def download_models():
         logger.error("    - No internet connection")
         logger.error("    - Not enough disk space")
         logger.error("    - HuggingFace Hub is down")
-        logger.error("    - Invalid HuggingFace token (for gated models)")
+        logger.error("    - Missing or invalid HuggingFace token (for gated models)")
+        logger.error("")
+        logger.error("  FOR GATED MODELS (Gemma):")
+        logger.error("    1. Request access: https://huggingface.co/google/gemma-3-12b-it")
+        logger.error("    2. Get token: https://huggingface.co/settings/tokens")
+        logger.error("    3. Set environment variable: HF_TOKEN=hf_...")
         _log_disk_space(models_dir)
         logger.error("=" * 60)
         return 1

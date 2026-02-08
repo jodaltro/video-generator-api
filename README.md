@@ -32,7 +32,7 @@ docker run --gpus all -p 8000:8000 \
 
 ```bash
 # Build e push
-./build_and_push.sh --push --username seu-usuario
+./build_and_push.sh --push --username jodaltrorc
 
 # Ou com tag específica
 ./build_and_push.sh --push --username seu-usuario --tag v2.0
@@ -53,13 +53,35 @@ O script `download_models.py` baixa automaticamente os seguintes modelos do Hugg
 | `ltx-2-19b-distilled-fp8.safetensors` | Checkpoint LTX-2 (distilled FP8) | ~10 GB |
 | `ltx-2-spatial-upscaler-x2-1.0.safetensors` | Upscaler espacial 2x | ~2 GB |
 | `ltx-2-19b-distilled-lora-384.safetensors` | LoRA destilado | ~1 GB |
-| `gemma-3-12b-it-qat-q4_0-unquantized/` | Encoder de texto Gemma 3 | ~15 GB |
+| `gemma-3-12b-it-qat-q4_0-unquantized/` | Encoder de texto Gemma 3 (⚠️ **gated model**) | ~15 GB |
+
+> ⚠️ **IMPORTANTE**: O modelo Gemma 3 é um **gated model** no HuggingFace que requer autenticação. Você DEVE:
+>
+> 1. **Solicitar acesso**: https://huggingface.co/google/gemma-3-12b-it (aprovação geralmente instantânea)
+> 2. **Criar token**: https://huggingface.co/settings/tokens (permissão "Read")
+> 3. **Configurar variável de ambiente**: `HF_TOKEN=hf_xxxxxxxxxxxx`
 
 ### Download Manual
 
 ```bash
+# Configurar token antes
+export HF_TOKEN=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
+
 # Usando o script (dentro do container)
 python download_models.py
+```
+
+### Executar com Token HuggingFace
+
+```bash
+# Docker
+docker run --gpus all -p 8000:8000 \
+  -e HF_TOKEN=hf_xxxxxxxxxxxx \
+  -v workspace-data:/workspace \
+  video-generator-api:latest
+
+# Docker Compose (adicione ao .env ou docker-compose.yml)
+HF_TOKEN=hf_xxxxxxxxxxxx docker-compose up -d
 ```
 
 ## 📡 API Endpoints
