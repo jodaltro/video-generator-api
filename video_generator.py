@@ -342,7 +342,7 @@ class VideoGenerator:
 
         # --- Upsampling: offload transformer, load upsampler ---
         logger.info("[Aggressive Offload] Offloading transformer to CPU for upsampling...")
-        transformer = transformer.to("cpu")
+        transformer = transformer.to(torch.device("cpu"))
         _cleanup_memory()
         self._log_gpu_memory("after transformer offload")
 

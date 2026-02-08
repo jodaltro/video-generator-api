@@ -145,7 +145,7 @@ Approximate GPU memory required (with FP8 enabled):
 | 384x576    | 49     | 2.0s     | ~13GB       | ✅ **Safe**    |
 | 512x768    | 33     | 1.3s     | ~14GB       | ✅ **Safe**    |
 | 512x768    | 75     | 3.0s     | ~16GB       | ✅ **Safe**    |
-| 512x768    | 121    | 4.8s     | ~18GB       | ⚠️  Risky      |
+| 512x768    | 121    | 4.8s     | ~18GB       | ✅ **Safe**    |
 | 768x1280   | 121    | 4.8s     | ~30GB+      | ❌ OOM         |
 
 ### Without Aggressive Offload
@@ -158,7 +158,7 @@ Approximate GPU memory required (with FP8 enabled):
 | 512x768    | 121    | 4.8s     | ~32GB       | ❌ OOM         |
 | 768x1280   | 121    | 4.8s     | ~50GB+      | ❌ OOM         |
 
-**Note**: The Text Encoder (Gemma) alone uses ~15-23GB when loading!
+**Note**: Without aggressive offload, the Text Encoder (Gemma) and Transformer are loaded simultaneously, using ~15-23GB. With aggressive offload enabled, only one large model is on GPU at a time, reducing peak usage significantly.
 
 ## Troubleshooting
 
