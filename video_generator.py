@@ -119,13 +119,15 @@ class VideoGenerator:
             # video will not reflect the prompt.
             if hasattr(self.pipeline, "text_encoder") and self.pipeline.text_encoder is not None:
                 text_encoder = self.pipeline.text_encoder
-                sync_method = "unset"
+                sync_method = "not_attempted"
+                sync_success = False
                 try:
                     if hasattr(text_encoder, "shared") and hasattr(text_encoder, "set_input_embeddings"):
                         # Use the model's helper to ensure embedding tying follows internal rules
                         sync_method = "set_input_embeddings"
                         text_encoder.set_input_embeddings(text_encoder.shared)
                         logger.info("Text encoder embeddings synced via set_input_embeddings")
+                        sync_success = True
                     elif (
                         hasattr(text_encoder, "shared")
                         and hasattr(text_encoder, "encoder")
@@ -135,15 +137,18 @@ class VideoGenerator:
                         sync_method = "encoder.embed_tokens assignment"
                         text_encoder.encoder.embed_tokens = text_encoder.shared
                         logger.info("Text encoder embeddings synced from shared weights")
+                        sync_success = True
                 except (AttributeError, ValueError, TypeError) as sync_error:
                     logger.warning(
                         f"Failed to sync text encoder embeddings using {sync_method} "
                         f"({type(sync_error).__name__}): {sync_error}"
                     )
 
-                if hasattr(text_encoder, "tie_weights"):
+                if sync_success and hasattr(text_encoder, "tie_weights"):
                     text_encoder.tie_weights()
                     logger.info("Text encoder weights tied successfully")
+                elif not sync_success:
+                    logger.warning("Skipping text encoder tie_weights because embedding sync failed")
 
             # Enable CPU offloading if requested (saves VRAM, CUDA only)
             if self.enable_cpu_offload and self.device == "cuda":
