@@ -118,8 +118,47 @@ class VideoGenerator:
             # encoder cannot convert tokens into embeddings and the generated
             # video will not reflect the prompt.
             if hasattr(self.pipeline, "text_encoder") and self.pipeline.text_encoder is not None:
-                self.pipeline.text_encoder.tie_weights()
-                logger.info("Text encoder weights tied successfully")
+                text_encoder = self.pipeline.text_encoder
+                sync_method = "unknown"
+                sync_success = False
+                has_shared = hasattr(text_encoder, "shared")
+                if not has_shared:
+                    logger.warning("Text encoder missing shared embeddings; cannot sync or tie weights")
+                else:
+                    try:
+                        if hasattr(text_encoder, "set_input_embeddings"):
+                            # Use the model's helper to ensure embedding tying follows internal rules
+                            sync_method = "set_input_embeddings"
+                            text_encoder.set_input_embeddings(text_encoder.shared)
+                            logger.info("Text encoder embeddings synced via set_input_embeddings")
+                            sync_success = True
+                        elif hasattr(text_encoder, "encoder") and hasattr(text_encoder.encoder, "embed_tokens"):
+                            # Fallback: ensure encoder embeddings share the pretrained "shared" weights
+                            sync_method = "encoder.embed_tokens assignment"
+                            text_encoder.encoder.embed_tokens = text_encoder.shared
+                            logger.info("Text encoder embeddings synced from shared weights")
+                            sync_success = True
+                        else:
+                            logger.warning("Text encoder shared embeddings found but no sync method is available")
+                    except (AttributeError, ValueError) as sync_error:
+                        method_desc = sync_method if sync_method is not None else "no sync method recorded"
+                        logger.error(
+                            f"Failed to sync text encoder embeddings using {method_desc} "
+                            f"({type(sync_error).__name__}): {sync_error}"
+                        )
+                        raise
+
+                    if sync_success:
+                        if hasattr(text_encoder, "tie_weights"):
+                            text_encoder.tie_weights()
+                            logger.info("Text encoder weights tied successfully")
+                        else:
+                            logger.info("Text encoder embeddings synced; tie_weights not available")
+                    else:
+                        failure_reason = (
+                            "no sync method was available" if sync_method == "unknown" else "embedding sync failed"
+                        )
+                        logger.warning(f"Skipping text encoder tie_weights because {failure_reason}")
 
             # Enable CPU offloading if requested (saves VRAM, CUDA only)
             if self.enable_cpu_offload and self.device == "cuda":
