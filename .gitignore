@@ -33,3 +33,4 @@ models/
 # Test outputs
 example_*.mp4
 test_output.mp4
+.pytest_cache/

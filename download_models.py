@@ -3,6 +3,7 @@
 Pre-download Wan2.1-T2V-1.3B model for faster startup.
 Downloads the model from HuggingFace to the models directory.
 """
+import json
 import os
 import sys
 import time
@@ -63,6 +64,49 @@ def _log_disk_space(models_dir: str):
         pass
 
 
+def _verify_model_files(wan_dir: str) -> bool:
+    """Verify that critical model files exist in the model directory.
+
+    Checks for the required subdirectories and key files that the
+    diffusers pipeline needs to load the Wan2.1-T2V-1.3B model.
+
+    Returns True if all critical files are present, False otherwise.
+    """
+    required_subdirs = ["transformer", "vae", "text_encoder", "scheduler", "tokenizer"]
+    for subdir in required_subdirs:
+        subdir_path = os.path.join(wan_dir, subdir)
+        if not os.path.isdir(subdir_path):
+            logger.warning(f"  Missing required subdirectory: {subdir}/")
+            return False
+
+    # Check that the transformer directory contains the model index file
+    # and at least one model shard
+    transformer_dir = os.path.join(wan_dir, "transformer")
+    index_file = os.path.join(transformer_dir, "diffusion_pytorch_model.safetensors.index.json")
+    if os.path.isfile(index_file):
+        # If an index file exists, verify that referenced shard files are present
+        try:
+            with open(index_file, "r") as f:
+                index_data = json.load(f)
+            shard_files = set(index_data.get("weight_map", {}).values())
+            for shard_file in shard_files:
+                shard_path = os.path.join(transformer_dir, shard_file)
+                if not os.path.isfile(shard_path):
+                    logger.warning(f"  Missing transformer shard file: {shard_file}")
+                    return False
+        except Exception as e:
+            logger.warning(f"  Failed to verify transformer index: {e}")
+            return False
+    else:
+        # No index file — check for a single model file instead
+        single_model = os.path.join(transformer_dir, "diffusion_pytorch_model.safetensors")
+        if not os.path.isfile(single_model):
+            logger.warning(f"  Missing transformer model file(s) in {transformer_dir}/")
+            return False
+
+    return True
+
+
 def download_models():
     """Download the Wan2.1-T2V-1.3B model"""
     from huggingface_hub import snapshot_download
@@ -81,17 +125,23 @@ def download_models():
 
     try:
         wan_dir = os.path.join(models_dir, WAN_DIR_NAME)
-        if os.path.exists(wan_dir) and os.listdir(wan_dir):
+        if os.path.exists(wan_dir) and os.listdir(wan_dir) and _verify_model_files(wan_dir):
             size = _get_dir_size(wan_dir)
             logger.info(
                 f"[1/1] ✅ SKIP {WAN_DIR_NAME}/ "
                 f"(already exists, {_format_size(size)})"
             )
         else:
-            logger.info(
-                f"[1/1] ⬇️  DOWNLOADING {WAN_DIR_NAME}/ "
-                f"from {WAN_MODEL_ID}... (~3-4 GB)"
-            )
+            if os.path.exists(wan_dir) and os.listdir(wan_dir):
+                logger.info(
+                    f"[1/1] ⬇️  COMPLETING {WAN_DIR_NAME}/ "
+                    f"(incomplete download detected, resuming from {WAN_MODEL_ID}...)"
+                )
+            else:
+                logger.info(
+                    f"[1/1] ⬇️  DOWNLOADING {WAN_DIR_NAME}/ "
+                    f"from {WAN_MODEL_ID}... (~3-4 GB)"
+                )
             file_start = time.time()
             snapshot_download(
                 repo_id=WAN_MODEL_ID,
