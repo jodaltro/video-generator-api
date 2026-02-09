@@ -124,8 +124,12 @@ class VideoGenerator:
                         # Use the model's helper to ensure embedding tying follows internal rules
                         text_encoder.set_input_embeddings(text_encoder.shared)
                         logger.info("Text encoder embeddings synced via set_input_embeddings")
-                    elif hasattr(text_encoder, "shared") and hasattr(text_encoder, "encoder"):
-                        # Fallback: ensure encoder embeddings share the pretrained \"shared\" weights
+                    elif (
+                        hasattr(text_encoder, "shared")
+                        and hasattr(text_encoder, "encoder")
+                        and hasattr(text_encoder.encoder, "embed_tokens")
+                    ):
+                        # Fallback: ensure encoder embeddings share the pretrained "shared" weights
                         text_encoder.encoder.embed_tokens = text_encoder.shared
                         logger.info("Text encoder embeddings synced from shared weights")
                 except (AttributeError, ValueError, TypeError) as sync_error:
