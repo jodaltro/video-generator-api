@@ -1,4 +1,4 @@
-# Use NVIDIA CUDA base image for GPU support with LTX-2
+# Use NVIDIA CUDA base image for GPU support with Wan2.1
 FROM nvidia/cuda:12.1.1-devel-ubuntu22.04
 
 # Set environment variables
@@ -51,7 +51,7 @@ RUN mkdir -p /workspace/models
 EXPOSE 8000
 
 # Health check (start-period accounts for first-run dependency installation and model download)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=600s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=300s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Run the application (installs dependencies and downloads models on first start, then starts the API)

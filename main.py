@@ -1,5 +1,5 @@
 """
-Video Generation API using LTX-2 Model
+Video Generation API using Wan2.1 Model
 Main FastAPI application
 """
 from fastapi import FastAPI, HTTPException
@@ -21,9 +21,9 @@ logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="Video Generator API (LTX-2)",
-    description="API for generating videos from text using the LTX-2 model from Lightricks",
-    version="2.0.0",
+    title="Video Generator API (Wan2.1)",
+    description="API for generating videos from text using the lightweight Wan2.1-T2V-1.3B model",
+    version="3.0.0",
     docs_url="/",
     redoc_url="/redoc"
 )
@@ -40,53 +40,53 @@ class VideoGenerationRequest(BaseModel):
         examples=["A serene sunset over the ocean with waves gently rolling"]
     )
     duration: float = Field(
-        default=1.3,
+        default=2.0,
         ge=1.0,
         le=10.0,
         description="Duration of the video in seconds (1-10). Shorter videos use less memory.",
-        examples=[1.3]
+        examples=[2.0]
     )
     num_frames: Optional[int] = Field(
         default=None,
         ge=8,
-        le=257,
-        description="Number of frames to generate (8-257). If not specified, calculated from duration and fps. Fewer frames use less memory.",
+        le=81,
+        description="Number of frames to generate (8-81). If not specified, calculated from duration and fps. Fewer frames use less memory.",
         examples=[33]
     )
     fps: int = Field(
-        default=25,
+        default=16,
         ge=8,
-        le=60,
-        description="Frames per second (8-60)",
-        examples=[25]
+        le=30,
+        description="Frames per second (8-30)",
+        examples=[16]
     )
     width: int = Field(
-        default=320,
+        default=480,
         ge=256,
         le=1280,
         description="Video width in pixels (256-1280, must be divisible by 8). Lower resolution uses less memory.",
-        examples=[320]
+        examples=[480]
     )
     height: int = Field(
-        default=512,
+        default=320,
         ge=256,
         le=1280,
         description="Video height in pixels (256-1280, must be divisible by 8). Lower resolution uses less memory.",
-        examples=[512]
+        examples=[320]
     )
     num_inference_steps: int = Field(
-        default=40,
+        default=25,
         ge=4,
         le=100,
-        description="Number of denoising steps (4-100). DistilledPipeline uses 8 predefined sigmas",
-        examples=[40]
+        description="Number of denoising steps (4-100)",
+        examples=[25]
     )
     guidance_scale: float = Field(
-        default=3.0,
+        default=5.0,
         ge=1.0,
         le=20.0,
         description="Guidance scale for prompt adherence (1-20). Higher = more prompt following",
-        examples=[3.0]
+        examples=[5.0]
     )
     seed: Optional[int] = Field(
         default=None,
@@ -98,12 +98,12 @@ class VideoGenerationRequest(BaseModel):
         json_schema_extra = {
             "example": {
                 "prompt": "A serene sunset over the ocean with waves gently rolling",
-                "duration": 1.3,
-                "fps": 25,
-                "width": 320,
-                "height": 512,
-                "num_inference_steps": 40,
-                "guidance_scale": 3.0,
+                "duration": 2.0,
+                "fps": 16,
+                "width": 480,
+                "height": 320,
+                "num_inference_steps": 25,
+                "guidance_scale": 5.0,
                 "seed": 42
             }
         }
@@ -124,13 +124,10 @@ def get_video_generator() -> VideoGenerator:
     """Get or initialize the video generator"""
     global video_generator
     if video_generator is None:
-        logger.info("Initializing LTX-2 video generator...")
+        logger.info("Initializing Wan2.1 video generator...")
         video_generator = VideoGenerator(
-            checkpoint_path=settings.checkpoint_path,
-            spatial_upsampler_path=settings.spatial_upsampler_path,
-            gemma_root=settings.gemma_root_path,
-            distilled_lora_path=settings.distilled_lora_path,
-            enable_fp8=settings.enable_fp8,
+            model_path=settings.model_path,
+            hf_model_id=settings.hf_model_id,
             enable_cpu_offload=settings.enable_cpu_offload,
             clear_cache_before_generation=settings.clear_cache_before_generation,
         )
@@ -152,7 +149,7 @@ async def health_check():
         model_loaded=video_generator is not None and video_generator.is_loaded(),
         device=device,
         models_dir=settings.models_dir,
-        message="Video Generator API (LTX-2) is running"
+        message="Video Generator API (Wan2.1) is running"
     )
 
 
@@ -168,15 +165,15 @@ async def health_check():
 )
 async def generate_video(request: VideoGenerationRequest):
     """
-    Generate a video from text prompt using LTX-2
+    Generate a video from text prompt using Wan2.1
 
     This endpoint generates a video based on the provided text prompt and parameters.
-    Uses the LTX-2 DistilledPipeline for fast inference.
+    Uses the Wan2.1-T2V-1.3B model for lightweight, fast inference.
 
     - **prompt**: Text description of the video to generate
     - **duration**: Length of video in seconds (1-10)
     - **num_frames**: Number of frames (optional, calculated from duration/fps if not provided)
-    - **fps**: Frames per second (8-60)
+    - **fps**: Frames per second (8-30)
     - **width**: Video width in pixels (256-1280, divisible by 8)
     - **height**: Video height in pixels (256-1280, divisible by 8)
     - **num_inference_steps**: Number of denoising steps (4-100)
@@ -203,7 +200,7 @@ async def generate_video(request: VideoGenerationRequest):
         if num_frames is None:
             num_frames = int(request.duration * request.fps)
             # Ensure it's within valid range
-            num_frames = max(8, min(257, num_frames))
+            num_frames = max(8, min(81, num_frames))
 
         # Generate video
         logger.info(f"Generating video with {num_frames} frames at {request.fps} fps")
@@ -246,7 +243,7 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     logger.info("=" * 60)
-    logger.info("  Video Generator API (LTX-2) - Server Starting")
+    logger.info("  Video Generator API (Wan2.1) - Server Starting")
     logger.info("=" * 60)
     logger.info(f"  Host: 0.0.0.0")
     logger.info(f"  Port: {port}")

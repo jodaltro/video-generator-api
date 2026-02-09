@@ -1,113 +1,84 @@
-# Memory Optimization Guide for LTX-2 Video Generation
+# Memory Optimization Guide for Wan2.1 Video Generation
 
-## 🚨 TL;DR - Quick Fix for 24GB GPUs
+## 🚨 TL;DR - Wan2.1 is already lightweight!
 
-**If you're getting "CUDA out of memory" errors:**
+The Wan2.1-T2V-1.3B model requires significantly less memory than the previous LTX-2 setup:
 
-1. ✅ **Use the new ultra-safe defaults** (already configured in API)
-2. ✅ **Test with minimum settings**:
-   - Resolution: `320x512`
-   - Frames: `33` (~1.3 seconds)
-   - This uses ~19GB, leaving a safe buffer
+- **Previous (LTX-2)**: ~30GB total (19B model + 12B text encoder)
+- **Current (Wan2.1)**: ~4GB total (1.3B model with built-in text encoder)
 
-3. ❌ **Don't use**: `512x768` or `num_frames > 50` on 24GB GPUs
-4. ⚠️ **CPU Offload doesn't work** with DistilledPipeline
+For most users with a GPU of 8GB+ VRAM, the default settings will work without issues.
 
 ---
 
-## The Problem
-LTX-2 is a large model that requires significant GPU memory. The model components (Text Encoder Gemma-3 12B, Transformer 19B, VAE) load into memory and can cause CUDA out of memory errors on GPUs with less than 32GB VRAM.
+## Memory Usage
 
-### Root Cause
-When calling the generation endpoint, the DistilledPipeline lazy-loads all model components:
-1. **Text Encoder (Gemma-3 12B)**: ~15GB when loading (~23GB total with transformer)
-2. **Transformer (LTX-2 19B FP8)**: ~10GB
-3. **VAE**: ~2GB
-4. **Activation Memory**: Variable based on video resolution/frames
+### Model Components
 
-On a 24GB GPU, loading all components simultaneously causes OOM errors.
+| Component | Size |
+|-----------|------|
+| Wan2.1-T2V-1.3B (FP16) | ~3 GB |
+| VAE (FP32) | ~0.5 GB |
+| Text Encoder (built-in) | ~0.5 GB |
+| **Total** | **~4 GB** |
 
-## Solutions Implemented
+### By Video Configuration
+
+| Resolution | Frames | Duration | Memory | Status on 8GB |
+|------------|--------|----------|--------|----------------|
+| 480x320    | 33     | 2.0s     | ~5GB   | ✅ **Safe**    |
+| 480x320    | 49     | 3.0s     | ~6GB   | ✅ **Safe**    |
+| 640x480    | 33     | 2.0s     | ~7GB   | ⚠️ Tight      |
+| 720x480    | 49     | 3.0s     | ~8GB   | ⚠️ Tight      |
+
+## Optimization Options
 
 ### 1. **Automatic GPU Cache Clearing** ✅
-The API now automatically clears GPU cache before each generation, freeing fragmented memory.
+The API automatically clears GPU cache before each generation, freeing fragmented memory.
 
 - **Enabled by default**
 - To disable: Set `CLEAR_CACHE_BEFORE_GENERATION=false` in environment
-- **Impact**: Minimal performance cost, significant memory benefit
 
 ### 2. **Expandable Memory Segments** ✅
-PyTorch memory allocator is now configured to use expandable segments, reducing fragmentation.
+PyTorch memory allocator is configured to use expandable segments, reducing fragmentation.
 
 - **Automatically configured**
 - Uses `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`
-- **Impact**: Better memory utilization, fewer fragmentation errors
 
-### 3. **CPU Offloading** ⚠️ (Limited Support)
-**Note**: The DistilledPipeline used by this API has limited CPU offloading support. Full offloading requires using the complete LTXVideoPipeline.
+### 3. **CPU Offloading** ✅
+For GPUs with very limited memory, enable CPU offloading:
 
-Current limitation:
-- `ENABLE_CPU_OFFLOAD` parameter exists but is not fully effective with DistilledPipeline
-- For production use on 24GB GPUs, **reduce video dimensions** instead
-
-To enable experimental offload:
 ```bash
 export ENABLE_CPU_OFFLOAD=true
 ```
 
-⚠️ **This will NOT solve 24GB memory issues!** Use smaller dimensions instead.
-
-### 4. **Memory Usage Logging** ✅
-The API now logs GPU memory usage at key stages:
-- Before cache clearing
-- After cache clearing
-- After model loading
-- During generation
+This moves model components to CPU when not in use, significantly reducing VRAM usage at the cost of speed.
 
 ## Recommended Settings for Limited GPU Memory
 
-### For 24GB GPU (GUARANTEED TO WORK) ✅
-```bash
-# Use the new ultra-safe defaults
+### For 8GB GPU ✅
+```json
 {
   "prompt": "Your prompt",
-  "width": 320,      # Ultra-safe
-  "height": 512,     # Ultra-safe
-  "num_frames": 33,  # ~1.3 seconds at 25fps
-  "duration": 1.3,
-  "fps": 25
+  "width": 480,
+  "height": 320,
+  "num_frames": 33,
+  "duration": 2.0,
+  "fps": 16
 }
 ```
 
-**Memory usage**: ~18-20GB (leaves 4-6GB buffer)
-
-### For 32GB+ GPU (More Quality)
-```bash
+### For 12GB+ GPU (Higher Quality)
+```json
 {
   "prompt": "Your prompt",
-  "width": 512,
-  "height": 768,
-  "num_frames": 75,  # 3 seconds
+  "width": 640,
+  "height": 480,
+  "num_frames": 49,
   "duration": 3.0,
-  "fps": 25
+  "fps": 16
 }
 ```
-
-**Memory usage**: ~28-30GB
-
-## Memory Usage by Video Configuration
-
-Approximate GPU memory required (with FP8 enabled):
-
-| Resolution | Frames | Duration | Memory | Status on 24GB |
-|------------|--------|----------|--------|----------------|
-| 320x512    | 33     | 1.3s     | ~19GB  | ✅ **Safe**    |
-| 384x576    | 49     | 2.0s     | ~22GB  | ⚠️  Risky      |
-| 512x768    | 75     | 3.0s     | ~28GB  | ❌ OOM         |
-| 512x768    | 121    | 4.8s     | ~32GB  | ❌ OOM         |
-| 768x1280   | 121    | 4.8s     | ~50GB+ | ❌ OOM         |
-
-**Note**: The Text Encoder (Gemma) alone uses ~15-23GB when loading!
 
 ## Troubleshooting
 
@@ -117,38 +88,6 @@ Approximate GPU memory required (with FP8 enabled):
 2. **Reduce frames**: Generate shorter videos
 3. **Enable CPU offload**: `ENABLE_CPU_OFFLOAD=true`
 4. **Restart API**: Clear all cached models
-   ```bash
-   docker-compose restart
-   ```
-
-5. **Check GPU usage before generation**:
-   ```bash
-   nvidia-smi
-   # Make sure no other processes are using GPU
-   ```
-
-### Kill Other GPU Processes
-```bash
-# Find processes using GPU
-nvidia-smi
-
-# Kill specific process
-kill -9 <PID>
-```
-
-### Monitor Memory During Generation
-```bash
-# In another terminal
-watch -n 1 nvidia-smi
-```
-
-## Best Practices
-
-1. **Start small**: Test with small resolutions first
-2. **Single request at a time**: Don't queue multiple requests
-3. **Monitor logs**: Check memory usage in API logs
-4. **Use FP8**: Keep `enable_fp8=True` (default)
-5. **Avoid concurrent requests**: Wait for completion before next request
 
 ## Environment Variables Reference
 
@@ -160,56 +99,15 @@ PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True  # Set automatically
 
 # Model Settings
 MODELS_DIR=/workspace/models           # Directory containing model files
-
-# Performance
-ENABLE_FP8=true                       # Use FP8 precision (recommended for memory efficiency)
 ```
 
-## Example API Requests
+## Comparison: LTX-2 vs Wan2.1
 
-### Ultra-Safe (Guaranteed for 24GB) ✅
-```bash
-curl -X POST "http://localhost:8000/generate" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "A serene sunset over the ocean",
-    "width": 320,
-    "height": 512,
-    "num_frames": 33,
-    "fps": 25,
-    "num_inference_steps": 40,
-    "guidance_scale": 3.0,
-    "seed": 42
-  }'
-```
-
-### Higher Quality (Requires 32GB+)
-```bash
-curl -X POST "http://localhost:8000/generate" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "A beautiful landscape with mountains",
-    "width": 512,
-    "height": 768,
-    "num_frames": 75,
-    "fps": 25,
-    "num_inference_steps": 40,
-    "guidance_scale": 3.0
-  }'
-```
-
-## Additional Resources
-
-- [PyTorch Memory Management](https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
-- [CUDA Best Practices](https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/)
-- [LTX-2 Repository](https://github.com/Lightricks/LTX-Video)
-
-## Summary
-
-The API now includes automatic memory management improvements. For immediate relief from OOM errors:
-
-1. ✅ **Already enabled**: Cache clearing and memory fragment reduction
-2. 🔧 **Try reducing**: Video resolution and frame count in your requests
-3. 🔧 **Optional**: Enable CPU offload if needed (`ENABLE_CPU_OFFLOAD=true`)
-
-These changes should allow you to generate videos successfully on 24GB GPUs.
+| Feature | LTX-2 (Previous) | Wan2.1 (Current) |
+|---------|-------------------|------------------|
+| Parameters | 19B + 12B text encoder | 1.3B (all-in-one) |
+| Model Size | ~30 GB | ~3-4 GB |
+| Min VRAM | 24 GB | 8 GB |
+| Audio | Yes | No |
+| HF Token Required | Yes (gated Gemma) | No (public) |
+| Custom Packages | Yes (ltx-pipelines) | No (diffusers) |

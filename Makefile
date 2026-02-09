@@ -1,7 +1,7 @@
 .PHONY: help install run test docker-build docker-run docker-push clean download-models
 
 help:
-	@echo "Video Generator API (LTX-2) - Available commands:"
+	@echo "Video Generator API (Wan2.1) - Available commands:"
 	@echo ""
 	@echo "  make install            - Install Python dependencies"
 	@echo "  make run                - Run the API locally"
@@ -13,7 +13,7 @@ help:
 	@echo "  make docker-push        - Build and push Docker image"
 	@echo "  make docker-compose-up  - Start with Docker Compose"
 	@echo "  make docker-compose-down - Stop Docker Compose"
-	@echo "  make download-models    - Download LTX-2 models"
+	@echo "  make download-models    - Download Wan2.1 model"
 	@echo "  make clean              - Clean generated files"
 	@echo ""
 
@@ -33,10 +33,10 @@ docker-build:
 	./build_and_push.sh
 
 docker-run:
-	docker run -p 8000:8000 -v workspace-data:/workspace -v pip-packages:/usr/local/lib/python3.10/dist-packages -v pip-bin:/usr/local/bin -v ltx2-repo:/opt/LTX-2 video-generator-api:latest
+	docker run -p 8000:8000 -v workspace-data:/workspace -v pip-packages:/usr/local/lib/python3.10/dist-packages -v pip-bin:/usr/local/bin video-generator-api:latest
 
 docker-run-gpu:
-	docker run --gpus all -p 8000:8000 -v workspace-data:/workspace -v pip-packages:/usr/local/lib/python3.10/dist-packages -v pip-bin:/usr/local/bin -v ltx2-repo:/opt/LTX-2 video-generator-api:latest
+	docker run --gpus all -p 8000:8000 -v workspace-data:/workspace -v pip-packages:/usr/local/lib/python3.10/dist-packages -v pip-bin:/usr/local/bin video-generator-api:latest
 
 docker-compose-up:
 	docker-compose up -d

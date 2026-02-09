@@ -3,7 +3,7 @@ set -e
 
 echo ""
 echo "=========================================="
-echo " Video Generator API (LTX-2) - Starting"
+echo " Video Generator API (Wan2.1) - Starting"
 echo "=========================================="
 echo ""
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] [START] Initializing pod..."
@@ -12,13 +12,10 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO]  PORT=${PORT:-8000}"
 echo ""
 
 # Install Python dependencies on first startup
-DEPS_MARKER="/workspace/.deps_installed"
+DEPS_MARKER="/workspace/.deps_installed_wan21"
 # Verify that key packages are actually importable; if not, force reinstall.
-# This handles the case where the marker file survives on the persistent volume
-# but pip packages are gone (e.g., container image was rebuilt or volumes were
-# not mounted).
 if [ -f "$DEPS_MARKER" ]; then
-    if ! python -c "import importlib.util; exit(0 if all(importlib.util.find_spec(m) for m in ['huggingface_hub','fastapi','transformers','torch']) else 1)" 2>/dev/null; then
+    if ! python -c "import importlib.util; exit(0 if all(importlib.util.find_spec(m) for m in ['huggingface_hub','fastapi','transformers','torch','diffusers']) else 1)" 2>/dev/null; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] [WARN]  Marker file exists but packages missing. Reinstalling..."
         rm -f "$DEPS_MARKER"
     fi
@@ -28,13 +25,7 @@ if [ ! -f "$DEPS_MARKER" ]; then
     echo ""
 
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO]  Installing PyTorch with CUDA support..."
-    pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO]  Cloning and installing LTX-2..."
-    if [ ! -d "/opt/LTX-2" ]; then
-        git clone https://github.com/Lightricks/LTX-2.git /opt/LTX-2
-    fi
-    (cd /opt/LTX-2 && pip install --no-cache-dir -e packages/ltx-core && pip install --no-cache-dir -e packages/ltx-pipelines)
+    pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO]  Installing requirements..."
     pip install --no-cache-dir -r requirements.txt

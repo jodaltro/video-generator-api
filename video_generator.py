@@ -1,8 +1,9 @@
 """
-Video Generator Service using LTX-2 Model
+Video Generator Service using Wan2.1 Model
 
-Uses the official LTX-2 pipelines from the Lightricks/LTX-2 repository.
-Supports text-to-video generation with the DistilledPipeline for fast inference.
+Uses the lightweight Wan2.1-T2V-1.3B model via HuggingFace diffusers.
+Supports text-to-video generation with significantly lower memory requirements
+compared to LTX-2 (~4GB vs ~30GB).
 """
 import os
 import logging
@@ -13,40 +14,33 @@ logger = logging.getLogger(__name__)
 
 
 class VideoGenerator:
-    """Video generator using LTX-2 model"""
+    """Video generator using Wan2.1-T2V-1.3B model"""
 
     def __init__(
         self,
-        checkpoint_path: str,
-        spatial_upsampler_path: str,
-        gemma_root: str,
-        distilled_lora_path: Optional[str] = None,
-        enable_fp8: bool = True,
+        model_path: str,
+        hf_model_id: str = "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
         enable_cpu_offload: bool = False,
         clear_cache_before_generation: bool = True,
     ):
         """
-        Initialize the video generator with LTX-2 model paths.
+        Initialize the video generator with Wan2.1 model.
 
         Args:
-            checkpoint_path: Path to LTX-2 checkpoint .safetensors file
-            spatial_upsampler_path: Path to spatial upscaler .safetensors file
-            gemma_root: Path to Gemma text encoder directory
-            distilled_lora_path: Path to distilled LoRA .safetensors file (optional)
-            enable_fp8: Whether to enable FP8 transformer for lower memory
+            model_path: Local path where the model is cached
+            hf_model_id: HuggingFace model ID for Wan2.1
+            enable_cpu_offload: Whether to enable CPU offloading for lower VRAM usage
+            clear_cache_before_generation: Whether to clear GPU cache before generation
         """
-        self.checkpoint_path = checkpoint_path
-        self.spatial_upsampler_path = spatial_upsampler_path
-        self.gemma_root = gemma_root
-        self.distilled_lora_path = distilled_lora_path
-        self.enable_fp8 = enable_fp8
+        self.model_path = model_path
+        self.hf_model_id = hf_model_id
         self.enable_cpu_offload = enable_cpu_offload
         self.clear_cache_before_generation = clear_cache_before_generation
         self.pipeline = None
         self.device = self._get_device()
         logger.info(f"VideoGenerator initialized with device: {self.device}")
         logger.info(f"CPU offload: {enable_cpu_offload}, Clear cache: {clear_cache_before_generation}")
-        
+
         # Set PyTorch memory allocation config for better memory management
         if self.device == "cuda":
             os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
@@ -59,7 +53,7 @@ class VideoGenerator:
             return "mps"
         else:
             return "cpu"
-    
+
     def _log_gpu_memory(self, stage: str = ""):
         """Log GPU memory usage"""
         if self.device == "cuda" and torch.cuda.is_available():
@@ -74,7 +68,7 @@ class VideoGenerator:
                 f"Free: {free:.2f}GB, "
                 f"Total: {total:.2f}GB"
             )
-    
+
     def _clear_gpu_cache(self):
         """Clear GPU cache to free memory"""
         if self.device == "cuda" and torch.cuda.is_available():
@@ -88,70 +82,60 @@ class VideoGenerator:
         """Check if the model is loaded"""
         return self.pipeline is not None
 
-    def _validate_model_files(self):
-        """Validate that all required model files exist"""
-        missing = []
-        if not os.path.exists(self.checkpoint_path):
-            missing.append(f"Checkpoint: {self.checkpoint_path}")
-        if not os.path.exists(self.spatial_upsampler_path):
-            missing.append(f"Spatial upsampler: {self.spatial_upsampler_path}")
-        if not os.path.isdir(self.gemma_root):
-            missing.append(f"Gemma encoder directory: {self.gemma_root}")
-        else:
-            # LTX-2 text encoder requires several configuration files
-            required_gemma_files = [
-                ("tokenizer.model", "SentencePiece tokenizer"),
-                ("preprocessor_config.json", "Preprocessor configuration"),
-                ("tokenizer_config.json", "Tokenizer configuration"),
-            ]
-            for filename, description in required_gemma_files:
-                filepath = os.path.join(self.gemma_root, filename)
-                if not os.path.exists(filepath):
-                    missing.append(
-                        f"Gemma {description}: {filepath} "
-                        "(the QAT model variant may not include this file)"
-                    )
-        if missing:
-            msg = "Missing model files:\n" + "\n".join(f"  - {m}" for m in missing)
-            msg += "\n\nRun 'python download_models.py' to download them."
-            raise FileNotFoundError(msg)
-
     def _load_model(self):
-        """Load the LTX-2 model (lazy loading)"""
+        """Load the Wan2.1 model (lazy loading)"""
         if self.pipeline is not None:
             return
 
-        logger.info("Loading LTX-2 model...")
-        self._validate_model_files()
+        logger.info("Loading Wan2.1-T2V-1.3B model...")
 
         try:
-            from ltx_pipelines.distilled import DistilledPipeline
+            from diffusers import AutoencoderKLWan, WanPipeline
+            from diffusers.utils import export_to_video  # noqa: F401
 
-            # If CPU offload is enabled, load models on CPU first
-            if self.enable_cpu_offload:
-                logger.info("CPU offloading enabled - loading models on CPU first...")
-                # Temporarily set device to CPU for initial load
-                original_device = self.device
-                # We'll still create the pipeline normally, but pass device parameter in generate
-                
-            self.pipeline = DistilledPipeline(
-                checkpoint_path=self.checkpoint_path,
-                spatial_upsampler_path=self.spatial_upsampler_path,
-                gemma_root=self.gemma_root,
-                loras=[],
-                fp8transformer=self.enable_fp8,
+            # Determine the source: use local cache if available, otherwise download
+            model_source = self.model_path if os.path.isdir(self.model_path) else self.hf_model_id
+
+            # Load the VAE in float32 for better quality
+            vae = AutoencoderKLWan.from_pretrained(
+                model_source,
+                subfolder="vae",
+                torch_dtype=torch.float32,
             )
 
-            logger.info("LTX-2 model loaded successfully!")
+            # Load the full pipeline
+            self.pipeline = WanPipeline.from_pretrained(
+                model_source,
+                vae=vae,
+                torch_dtype=torch.float16,
+            )
+
+            # Enable CPU offloading if requested (saves VRAM)
             if self.enable_cpu_offload:
-                logger.info("Models will be offloaded to CPU when not in use")
-        num_inference_steps: int = 40,
-        guidance_scale: float = 3.0,
-        fps: int = 25,
+                logger.info("Enabling model CPU offloading...")
+                self.pipeline.enable_model_cpu_offload()
+            else:
+                self.pipeline = self.pipeline.to(self.device)
+
+            logger.info("Wan2.1-T2V-1.3B model loaded successfully!")
+
+        except Exception as e:
+            logger.error(f"Failed to load Wan2.1 model: {e}")
+            raise
+
+    def generate(
+        self,
+        prompt: str,
+        num_frames: int = 33,
+        width: int = 480,
+        height: int = 320,
+        num_inference_steps: int = 25,
+        guidance_scale: float = 5.0,
+        fps: int = 16,
         seed: Optional[int] = None,
     ) -> str:
         """
-        Generate a video from text prompt using LTX-2.
+        Generate a video from text prompt using Wan2.1.
 
         Args:
             prompt: Text description of the video
@@ -167,17 +151,15 @@ class VideoGenerator:
             Path to generated MP4 file
         """
         import tempfile
-        from ltx_pipelines.utils.media_io import encode_video
-        from ltx_pipelines.utils.constants import AUDIO_SAMPLE_RATE
-        from ltx_core.model.video_vae import TilingConfig, get_video_chunks_number
+        from diffusers.utils import export_to_video
 
         # Clear GPU cache before generation if enabled
         if self.clear_cache_before_generation:
             self._clear_gpu_cache()
-        
+
         # Load model if not already loaded
         self._load_model()
-        
+
         self._log_gpu_memory("after model load")
 
         if seed is None:
@@ -192,32 +174,21 @@ class VideoGenerator:
         fd, output_path = tempfile.mkstemp(suffix=".mp4")
         os.close(fd)
 
-        # Generate video using LTX-2 DistilledPipeline
-        # DistilledPipeline returns (video_tensor, audio_tensor) instead of writing to file
-        tiling_config = TilingConfig.default()
-        video_chunks_number = get_video_chunks_number(num_frames, tiling_config)
+        # Generate video using Wan2.1 pipeline
+        generator = torch.Generator(device=self.device).manual_seed(seed)
 
-        video, audio = self.pipeline(
+        output = self.pipeline(
             prompt=prompt,
-            seed=seed,
+            num_frames=num_frames,
             height=height,
             width=width,
-            num_frames=num_frames,
-            frame_rate=float(fps),
-            images=[],  # No image conditioning
-            tiling_config=tiling_config,
-            enhance_prompt=False,
+            num_inference_steps=num_inference_steps,
+            guidance_scale=guidance_scale,
+            generator=generator,
         )
 
-        # Encode the video and audio to output file
-        encode_video(
-            video=video,
-            fps=fps,
-            audio=audio,
-            audio_sample_rate=AUDIO_SAMPLE_RATE,
-            output_path=output_path,
-            video_chunks_number=video_chunks_number,
-        )
+        # Export video frames to MP4
+        export_to_video(output.frames[0], output_path, fps=fps)
 
         logger.info(f"Video generated: {output_path}")
         return output_path

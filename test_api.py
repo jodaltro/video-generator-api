@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script for Video Generator API (LTX-2)
+Test script for Video Generator API (Wan2.1)
 """
 import requests
 import sys
@@ -28,12 +28,12 @@ def test_generate_video(base_url: str = "http://localhost:8000"):
 
     payload = {
         "prompt": "A serene sunset over the ocean with waves gently rolling, golden light reflecting on the water surface",
-        "duration": 1.3,
-        "fps": 25,
-        "width": 320,
-        "height": 512,
-        "num_inference_steps": 40,
-        "guidance_scale": 3.0,
+        "duration": 2.0,
+        "fps": 16,
+        "width": 480,
+        "height": 320,
+        "num_inference_steps": 25,
+        "guidance_scale": 5.0,
         "seed": 42
     }
 
@@ -75,7 +75,7 @@ def main():
     """Run all tests"""
     base_url = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8000"
 
-    print(f"Testing Video Generator API (LTX-2) at {base_url}\n")
+    print(f"Testing Video Generator API (Wan2.1) at {base_url}\n")
     print("=" * 60)
 
     # Test health check
