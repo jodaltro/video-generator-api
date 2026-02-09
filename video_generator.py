@@ -123,7 +123,6 @@ class VideoGenerator:
                     if hasattr(text_encoder, "shared") and hasattr(text_encoder, "encoder"):
                         # Ensure encoder embeddings share the pretrained "shared" weights
                         text_encoder.encoder.embed_tokens = text_encoder.shared
-                        text_encoder.encoder.embed_tokens.weight = text_encoder.shared.weight
                         logger.info("Text encoder embeddings synced from shared weights")
                 except Exception as tie_error:
                     logger.warning(f"Failed to sync text encoder embeddings: {tie_error}")
