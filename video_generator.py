@@ -141,21 +141,22 @@ class VideoGenerator:
                         sync_success = True
                 except ValueError as sync_error:
                     logger.error(
-                        f"Failed to sync text encoder embeddings using {sync_method or 'no compatible method found'} "
+                        f"Failed to sync text encoder embeddings using {sync_method or 'unknown'} "
                         f"({type(sync_error).__name__}): {sync_error}"
                     )
                     raise
                 except (AttributeError, TypeError) as sync_error:
                     logger.warning(
-                        f"Failed to sync text encoder embeddings using {sync_method or 'no compatible method found'} "
+                        f"Failed to sync text encoder embeddings using {sync_method or 'unknown'} "
                         f"({type(sync_error).__name__}): {sync_error}"
                     )
 
-                if sync_success and hasattr(text_encoder, "tie_weights"):
-                    text_encoder.tie_weights()
-                    logger.info("Text encoder weights tied successfully")
-                elif sync_success:
-                    logger.info("Text encoder embeddings synced; tie_weights not available")
+                if sync_success:
+                    if hasattr(text_encoder, "tie_weights"):
+                        text_encoder.tie_weights()
+                        logger.info("Text encoder weights tied successfully")
+                    else:
+                        logger.info("Text encoder embeddings synced; tie_weights not available")
                 else:
                     logger.warning("Skipping text encoder tie_weights because embedding sync failed")
 
