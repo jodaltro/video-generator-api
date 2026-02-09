@@ -119,7 +119,7 @@ class VideoGenerator:
             # video will not reflect the prompt.
             if hasattr(self.pipeline, "text_encoder") and self.pipeline.text_encoder is not None:
                 text_encoder = self.pipeline.text_encoder
-                sync_method = None
+                sync_method = "not attempted"
                 sync_success = False
                 has_shared = hasattr(text_encoder, "shared")
                 try:
@@ -139,17 +139,12 @@ class VideoGenerator:
                         text_encoder.encoder.embed_tokens = text_encoder.shared
                         logger.info("Text encoder embeddings synced from shared weights")
                         sync_success = True
-                except ValueError as sync_error:
+                except (AttributeError, TypeError, ValueError) as sync_error:
                     logger.error(
                         f"Failed to sync text encoder embeddings using {sync_method or 'unknown'} "
                         f"({type(sync_error).__name__}): {sync_error}"
                     )
                     raise
-                except (AttributeError, TypeError) as sync_error:
-                    logger.warning(
-                        f"Failed to sync text encoder embeddings using {sync_method or 'unknown'} "
-                        f"({type(sync_error).__name__}): {sync_error}"
-                    )
 
                 if sync_success:
                     if hasattr(text_encoder, "tie_weights"):
