@@ -110,8 +110,8 @@ class VideoGenerator:
                 torch_dtype=torch.float16,
             )
 
-            # Enable CPU offloading if requested (saves VRAM)
-            if self.enable_cpu_offload:
+            # Enable CPU offloading if requested (saves VRAM, CUDA only)
+            if self.enable_cpu_offload and self.device == "cuda":
                 logger.info("Enabling model CPU offloading...")
                 self.pipeline.enable_model_cpu_offload()
             else:
