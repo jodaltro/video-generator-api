@@ -93,6 +93,11 @@ class VideoGenerationRequest(BaseModel):
         description="Random seed for reproducibility. If not specified, uses random seed",
         examples=[42]
     )
+    negative_prompt: Optional[str] = Field(
+        default=None,
+        description="Text describing what to avoid in the video. Uses a sensible default if not provided.",
+        examples=["Bright tones, overexposed, static, blurred details, worst quality, low quality"]
+    )
 
     class Config:
         json_schema_extra = {
@@ -171,6 +176,7 @@ async def generate_video(request: VideoGenerationRequest):
     Uses the Wan2.1-T2V-1.3B model for lightweight, fast inference.
 
     - **prompt**: Text description of the video to generate
+    - **negative_prompt**: Text describing what to avoid (optional, uses sensible default)
     - **duration**: Length of video in seconds (1-10)
     - **num_frames**: Number of frames (optional, calculated from duration/fps if not provided)
     - **fps**: Frames per second (8-30)
@@ -206,6 +212,7 @@ async def generate_video(request: VideoGenerationRequest):
         logger.info(f"Generating video with {num_frames} frames at {request.fps} fps")
         output_path = generator.generate(
             prompt=request.prompt,
+            negative_prompt=request.negative_prompt,
             num_frames=num_frames,
             width=request.width,
             height=request.height,
