@@ -118,8 +118,19 @@ class VideoGenerator:
             # encoder cannot convert tokens into embeddings and the generated
             # video will not reflect the prompt.
             if hasattr(self.pipeline, "text_encoder") and self.pipeline.text_encoder is not None:
-                self.pipeline.text_encoder.tie_weights()
-                logger.info("Text encoder weights tied successfully")
+                text_encoder = self.pipeline.text_encoder
+                try:
+                    if hasattr(text_encoder, "shared") and hasattr(text_encoder, "encoder"):
+                        # Ensure encoder embeddings share the pretrained "shared" weights
+                        text_encoder.encoder.embed_tokens = text_encoder.shared
+                        text_encoder.encoder.embed_tokens.weight = text_encoder.shared.weight
+                        logger.info("Text encoder embeddings synced from shared weights")
+                except Exception as tie_error:
+                    logger.warning(f"Failed to sync text encoder embeddings: {tie_error}")
+
+                if hasattr(text_encoder, "tie_weights"):
+                    text_encoder.tie_weights()
+                    logger.info("Text encoder weights tied successfully")
 
             # Enable CPU offloading if requested (saves VRAM, CUDA only)
             if self.enable_cpu_offload and self.device == "cuda":
