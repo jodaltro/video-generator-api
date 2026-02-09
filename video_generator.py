@@ -119,7 +119,7 @@ class VideoGenerator:
             # video will not reflect the prompt.
             if hasattr(self.pipeline, "text_encoder") and self.pipeline.text_encoder is not None:
                 text_encoder = self.pipeline.text_encoder
-                sync_method = None
+                sync_method = "no compatible method found"
                 sync_success = False
                 has_shared = hasattr(text_encoder, "shared")
                 try:
