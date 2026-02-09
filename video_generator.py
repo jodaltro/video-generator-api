@@ -119,17 +119,18 @@ class VideoGenerator:
             # video will not reflect the prompt.
             if hasattr(self.pipeline, "text_encoder") and self.pipeline.text_encoder is not None:
                 text_encoder = self.pipeline.text_encoder
-                sync_method = "not_attempted"
+                sync_method = None
                 sync_success = False
+                has_shared = hasattr(text_encoder, "shared")
                 try:
-                    if hasattr(text_encoder, "shared") and hasattr(text_encoder, "set_input_embeddings"):
+                    if has_shared and hasattr(text_encoder, "set_input_embeddings"):
                         # Use the model's helper to ensure embedding tying follows internal rules
                         sync_method = "set_input_embeddings"
                         text_encoder.set_input_embeddings(text_encoder.shared)
                         logger.info("Text encoder embeddings synced via set_input_embeddings")
                         sync_success = True
                     elif (
-                        hasattr(text_encoder, "shared")
+                        has_shared
                         and hasattr(text_encoder, "encoder")
                         and hasattr(text_encoder.encoder, "embed_tokens")
                     ):
@@ -140,7 +141,7 @@ class VideoGenerator:
                         sync_success = True
                 except (AttributeError, ValueError, TypeError) as sync_error:
                     logger.warning(
-                        f"Failed to sync text encoder embeddings using {sync_method} "
+                        f"Failed to sync text encoder embeddings using {sync_method or 'unknown'} "
                         f"({type(sync_error).__name__}): {sync_error}"
                     )
 
