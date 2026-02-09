@@ -141,7 +141,7 @@ class VideoGenerator:
                         sync_success = True
                 except (AttributeError, ValueError, TypeError) as sync_error:
                     logger.warning(
-                        f"Failed to sync text encoder embeddings using {sync_method or 'unknown'} "
+                        f"Failed to sync text encoder embeddings using {sync_method} "
                         f"({type(sync_error).__name__}): {sync_error}"
                     )
 
