@@ -96,6 +96,9 @@ class VideoGenerator:
             # Determine the source: use local cache if available, otherwise download
             model_source = self.model_path if os.path.isdir(self.model_path) else self.hf_model_id
 
+            # Use full precision on CPU to avoid poor outputs (brown/static frames)
+            model_dtype = torch.float16 if self.device != "cpu" else torch.float32
+
             # Load the VAE in float32 for better quality
             vae = AutoencoderKLWan.from_pretrained(
                 model_source,
@@ -107,7 +110,7 @@ class VideoGenerator:
             self.pipeline = WanPipeline.from_pretrained(
                 model_source,
                 vae=vae,
-                torch_dtype=torch.float16,
+                torch_dtype=model_dtype,
             )
 
             # Fix UMT5 text encoder weight tying: the shared.weight must be
