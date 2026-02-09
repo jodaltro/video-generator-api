@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Example usage of the Video Generator API (LTX-2)
+Example usage of the Video Generator API (Wan2.1)
 """
 import requests
 import json
@@ -18,9 +18,9 @@ def example_basic_generation():
 
     payload = {
         "prompt": "A beautiful sunset over mountains with birds flying across the golden sky, warm light illuminating the peaks",
-        "duration": 1.3,
-        "width": 320,
-        "height": 512,
+        "duration": 2.0,
+        "width": 480,
+        "height": 320,
     }
 
     print(f"\nRequest payload:")
@@ -54,12 +54,12 @@ def example_custom_parameters():
 
     payload = {
         "prompt": "A cat playing with a ball of yarn in a cozy living room, soft afternoon light streaming through the window, the cat pounces and rolls with the yarn",
-        "duration": 1.3,
-        "fps": 25,
-        "width": 320,
-        "height": 512,
-        "num_inference_steps": 40,
-        "guidance_scale": 4.0,
+        "duration": 2.0,
+        "fps": 16,
+        "width": 480,
+        "height": 320,
+        "num_inference_steps": 25,
+        "guidance_scale": 5.0,
         "seed": 12345  # For reproducibility
     }
 
@@ -103,10 +103,10 @@ def example_multiple_videos():
 
         payload = {
             "prompt": prompt,
-            "duration": 1.3,
-            "width": 320,
-            "height": 512,
-            "num_inference_steps": 40
+            "duration": 2.0,
+            "width": 480,
+            "height": 320,
+            "num_inference_steps": 25
         }
 
         start = time.time()
@@ -148,7 +148,7 @@ def check_api_status():
 
 def main():
     """Run all examples"""
-    print("Video Generator API (LTX-2) - Usage Examples")
+    print("Video Generator API (Wan2.1) - Usage Examples")
     print("=" * 60)
     print()
 

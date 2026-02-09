@@ -1,8 +1,8 @@
-# RunPod Deployment Guide (LTX-2)
+# RunPod Deployment Guide (Wan2.1)
 
 ## Overview
 
-This guide explains how to deploy the Video Generator API with LTX-2 on RunPod with GPU support.
+This guide explains how to deploy the Video Generator API with Wan2.1 on RunPod with GPU support.
 
 ## Prerequisites
 
@@ -17,7 +17,7 @@ This guide explains how to deploy the Video Generator API with LTX-2 on RunPod w
 ./build_and_push.sh --push --username your-username
 
 # Or with a specific tag
-./build_and_push.sh --push --username your-username --tag v2.0
+./build_and_push.sh --push --username your-username --tag v3.0
 ```
 
 ## Step 2: Create a RunPod Template
@@ -25,10 +25,10 @@ This guide explains how to deploy the Video Generator API with LTX-2 on RunPod w
 1. Go to RunPod Templates
 2. Click "New Template"
 3. Configure:
-   - **Template Name**: Video Generator API LTX-2
+   - **Template Name**: Video Generator API Wan2.1
    - **Container Image**: `your-username/video-generator-api:latest`
-   - **Container Disk**: 20 GB
-   - **Volume Disk**: 100 GB (for LTX-2 models ~30 GB total)
+   - **Container Disk**: 10 GB
+   - **Volume Disk**: 20 GB (for Wan2.1 model ~4 GB total)
    - **Volume Path**: `/workspace`
    - **Expose HTTP Ports**: `8000`
    - **Environment Variables**:
@@ -36,15 +36,9 @@ This guide explains how to deploy the Video Generator API with LTX-2 on RunPod w
      PORT=8000
      MODELS_DIR=/workspace/models
      PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
-     HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
      ```
-   
-   > ⚠️ **IMPORTANTE - Token HuggingFace Obrigatório**:
-   > 
-   > O modelo Gemma 3 é **gated** e requer autenticação:
-   > 1. Solicite acesso: https://huggingface.co/google/gemma-3-12b-it
-   > 2. Crie um token: https://huggingface.co/settings/tokens (permissão "Read")
-   > 3. Adicione `HF_TOKEN` nas variáveis de ambiente acima
+
+   > ✅ **No HuggingFace token required** - the Wan2.1 model is public.
 
 ## Step 3: Deploy a Pod
 
@@ -52,34 +46,29 @@ This guide explains how to deploy the Video Generator API with LTX-2 on RunPod w
 2. Click "Deploy"
 3. Select your template
 4. Choose GPU:
-   - **Recommended**: NVIDIA A40 (48GB VRAM) or A100 (80GB VRAM)
-   - **Minimum**: RTX 4090 (24GB VRAM) with FP8 checkpoint
+   - **Minimum**: Any NVIDIA GPU with 8GB+ VRAM
+   - **Recommended**: RTX 4070 (12GB VRAM) or better
 5. Select Storage:
-   - **Container Disk**: 20 GB minimum
-   - **Volume**: 100 GB recommended (for persistent model storage)
+   - **Container Disk**: 10 GB minimum
+   - **Volume**: 20 GB recommended (for persistent model storage)
 6. Click "Deploy"
 
 ## Step 4: Automatic Setup on First Start
 
 When the pod starts for the first time, the container will automatically:
 
-1. **Install Python dependencies** (PyTorch, LTX-2 pipelines, etc.)
-2. Check for existing models in `/workspace/models`
-3. Download any missing models from HuggingFace
+1. **Install Python dependencies** (PyTorch, diffusers, etc.)
+2. Check for existing model in `/workspace/models`
+3. Download the Wan2.1 model from HuggingFace if missing
 4. Start the API server
 
-> **Note**: The Docker image is lightweight — Python dependencies are installed at runtime to keep the image small. Use persistent volumes to avoid re-installing on restarts.
-
 The download includes:
-- `ltx-2-19b-distilled-fp8.safetensors` (~10 GB)
-- `ltx-2-spatial-upscaler-x2-1.0.safetensors` (~2 GB)
-- `ltx-2-19b-distilled-lora-384.safetensors` (~1 GB)
-- `gemma-3-12b-it-qat-q4_0-unquantized/` (~15 GB)
+- `Wan2.1-T2V-1.3B-Diffusers/` (~3-4 GB)
 
-**Total**: ~30 GB
-**Estimated time**: 10-30 minutes depending on network speed.
+**Total**: ~4 GB
+**Estimated time**: 2-5 minutes depending on network speed.
 
-> **Note**: On subsequent restarts, if dependencies and models are stored on a persistent volume, installation/download is skipped and the API starts immediately.
+> **Note**: On subsequent restarts, if dependencies and model are stored on a persistent volume, installation/download is skipped and the API starts immediately.
 
 ## Step 5: Test the API
 
@@ -94,9 +83,9 @@ curl -X POST "https://your-pod-id-8000.proxy.runpod.net/generate" \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "A cat playing with a ball of yarn in a cozy living room",
-    "duration": 3.0,
-    "width": 512,
-    "height": 768
+    "duration": 2.0,
+    "width": 480,
+    "height": 320
   }' \
   --output video.mp4
 ```
@@ -105,29 +94,28 @@ curl -X POST "https://your-pod-id-8000.proxy.runpod.net/generate" \
 
 ### GPU Selection
 
-| GPU | VRAM | Speed | Cost | Notes |
-|-----|------|-------|------|-------|
-| RTX 4090 | 24GB | ~2-3 min | $$ | FP8 only |
-| A40 | 48GB | ~1-2 min | $$$ | Recommended |
-| A100 | 80GB | ~1 min | $$$$ | Best performance |
+| GPU | VRAM | Cost | Notes |
+|-----|------|------|-------|
+| RTX 3060 | 8GB | $ | Minimum, works fine |
+| RTX 4070 | 12GB | $$ | Recommended |
+| RTX 4090 | 24GB | $$$ | Fastest |
 
 ### Optimization Settings
 
 For faster generation:
-- Use the DistilledPipeline (default) - fastest with 8 predefined sigmas
-- Use FP8 checkpoint (default) - lower memory footprint
-- Use `width: 512, height: 768` (default resolution)
+- Use lower resolution (480x320)
+- Use fewer inference steps (25)
 
 For better quality:
-- Use `ltx-2-19b-dev` or `ltx-2-19b-dev-fp8` checkpoint
 - Use higher resolution if VRAM allows
+- Use more inference steps (50)
 
 ### Volume Storage
 
 **Recommended setup:**
 - Mount volume at `/workspace`
 - Set `MODELS_DIR=/workspace/models`
-- Models persist across pod restarts
+- Model persists across pod restarts
 - Much faster startup after first download
 
 ## Troubleshooting
@@ -138,18 +126,15 @@ For better quality:
 - Check RunPod logs for errors
 
 ### Model download fails
-- **Missing HF_TOKEN**: Check that you set the `HF_TOKEN` environment variable
-- **No access to Gemma**: Request access at https://huggingface.co/google/gemma-3-12b-it
 - Check internet connectivity
-- Verify disk space (need 50GB+)
+- Verify disk space (need 10GB+)
 - Check HuggingFace Hub status
 - Re-run `python download_models.py` (supports resume)
 
 ### Out of memory errors
-- Use FP8 checkpoint (default)
-- Reduce resolution (384x512)
-- Reduce num_frames (60-80)
-- Use A40 or A100 GPU
+- Reduce resolution (320x256)
+- Reduce num_frames (16-24)
+- Enable CPU offload: `ENABLE_CPU_OFFLOAD=true`
 
 ### "Model files not found" error
 - Check the pod logs to see if the automatic download completed successfully

@@ -1,9 +1,4 @@
-# Quick Start Guide (LTX-2)
-
-> ⚠️ **BEFORE YOU START**: You need a HuggingFace token to download the Gemma 3 model (gated):
-> 1. Request access: https://huggingface.co/google/gemma-3-12b-it
-> 2. Get token: https://huggingface.co/settings/tokens (Read permission)
-> 3. Set `HF_TOKEN=hf_xxxxxxxxxxxx` in your environment
+# Quick Start Guide (Wan2.1)
 
 ## Docker Deployment (Recommended)
 
@@ -17,17 +12,15 @@
 
 ```bash
 docker run --gpus all -p 8000:8000 \
-  -e HF_TOKEN=hf_xxxxxxxxxxxx \
   -v workspace-data:/workspace \
   -v pip-packages:/usr/local/lib/python3.10/dist-packages \
   -v pip-bin:/usr/local/bin \
-  -v ltx2-repo:/opt/LTX-2 \
   video-generator-api:latest
 ```
 
 On first run, the container will automatically:
-1. Install Python dependencies (PyTorch, LTX-2, etc.)
-2. Download ~30 GB of model files (takes 10-30 minutes)
+1. Install Python dependencies (PyTorch, diffusers, etc.)
+2. Download ~4 GB model files (takes 2-5 minutes)
 
 Subsequent starts will skip installation if volumes are preserved.
 
@@ -57,9 +50,9 @@ curl -X POST "http://localhost:8000/generate" \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "A cat playing with a ball of yarn in a cozy living room",
-    "duration": 3.0,
-    "width": 512,
-    "height": 768
+    "duration": 2.0,
+    "width": 480,
+    "height": 320
   }' \
   --output my_video.mp4
 ```
@@ -67,14 +60,11 @@ curl -X POST "http://localhost:8000/generate" \
 ## Docker Compose
 
 ```bash
-# Set your HuggingFace token first
-export HF_TOKEN=hf_xxxxxxxxxxxx
-
 # Start the service
-HF_TOKEN=$HF_TOKEN docker-compose up
+docker-compose up
 
 # Or in detached mode
-HF_TOKEN=$HF_TOKEN docker-compose up -d
+docker-compose up -d
 
 # View logs
 docker-compose logs -f
@@ -83,33 +73,32 @@ docker-compose logs -f
 docker-compose down
 ```
 
-> **Tip**: Create a `.env` file (copy from `.env.example`) with your `HF_TOKEN` to avoid setting it each time.
-
 ## Important Notes
 
 ### First Run
-- Dependencies and models are installed/downloaded automatically on first start
+- Dependencies and model are installed/downloaded automatically on first start
 - The image is lightweight; Python packages are installed at runtime
-- Models are ~30 GB total (LTX-2 checkpoint + Gemma encoder + upscaler + LoRA)
+- Model is ~4 GB total (Wan2.1-T2V-1.3B)
+- No HuggingFace token required (public model)
 - Use persistent volumes to avoid re-downloading on restarts
 
 ### Hardware Requirements
 - **GPU (NVIDIA)**: Required - CUDA 12.1+ compatible
-- **Minimum VRAM**: 24 GB (RTX 4090, with FP8 checkpoint)
-- **Recommended VRAM**: 48 GB (A40) or 80 GB (A100)
-- **RAM**: 32 GB minimum
-- **Disk space**: 50 GB minimum (for models)
+- **Minimum VRAM**: 8 GB (RTX 3060)
+- **Recommended VRAM**: 12 GB (RTX 4070)
+- **RAM**: 16 GB minimum
+- **Disk space**: 10 GB minimum (for model)
 
 ### Performance Tips
 For faster generation:
-- Use the DistilledPipeline (default) - fastest with predefined sigmas
-- Use FP8 checkpoint (default) - lower memory footprint
-- Lower resolution (384x512)
+- Use lower resolution (480x320)
+- Fewer frames (33)
+- Fewer inference steps (25)
 
 For better quality:
-- Use `ltx-2-19b-dev` checkpoint
-- Higher resolution (768x1024)
-- More inference steps
+- Higher resolution (640x480)
+- More frames
+- More inference steps (50)
 
 ## Build and Push to Docker Hub
 
@@ -118,7 +107,7 @@ For better quality:
 ./build_and_push.sh --push --username your-username
 
 # With version tag
-./build_and_push.sh --push --username your-username --tag v2.0
+./build_and_push.sh --push --username your-username --tag v3.0
 ```
 
 ## Testing
