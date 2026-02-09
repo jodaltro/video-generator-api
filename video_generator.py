@@ -110,6 +110,14 @@ class VideoGenerator:
                 torch_dtype=torch.float16,
             )
 
+            # Fix UMT5 text encoder weight tying: the shared.weight must be
+            # tied to encoder.embed_tokens.weight.  Without this, the text
+            # encoder cannot convert tokens into embeddings and the generated
+            # video will not reflect the prompt.
+            if hasattr(self.pipeline, "text_encoder") and self.pipeline.text_encoder is not None:
+                self.pipeline.text_encoder.tie_weights()
+                logger.info("Text encoder weights tied successfully")
+
             # Enable CPU offloading if requested (saves VRAM, CUDA only)
             if self.enable_cpu_offload and self.device == "cuda":
                 logger.info("Enabling model CPU offloading...")
@@ -123,9 +131,20 @@ class VideoGenerator:
             logger.error(f"Failed to load Wan2.1 model: {e}")
             raise
 
+    # Default negative prompt to steer the model away from common artifacts
+    DEFAULT_NEGATIVE_PROMPT = (
+        "Bright tones, overexposed, static, blurred details, subtitles, style, works, "
+        "paintings, images, static, overall gray, worst quality, low quality, "
+        "JPEG compression residue, ugly, incomplete, extra fingers, poorly drawn hands, "
+        "poorly drawn faces, deformed, disfigured, misshapen limbs, fused fingers, "
+        "still picture, messy background, three legs, many people in the background, "
+        "walking backwards"
+    )
+
     def generate(
         self,
         prompt: str,
+        negative_prompt: Optional[str] = None,
         num_frames: int = 33,
         width: int = 480,
         height: int = 320,
@@ -139,6 +158,8 @@ class VideoGenerator:
 
         Args:
             prompt: Text description of the video
+            negative_prompt: Text describing what to avoid in the video.
+                Uses a sensible default if not provided.
             num_frames: Number of frames to generate
             width: Video width in pixels
             height: Video height in pixels
@@ -166,6 +187,9 @@ class VideoGenerator:
             seed = torch.randint(0, 2**32, (1,)).item()
         logger.info(f"Using seed: {seed}")
 
+        if negative_prompt is None:
+            negative_prompt = self.DEFAULT_NEGATIVE_PROMPT
+
         logger.info(
             f"Generating video: {width}x{height}, {num_frames} frames, {fps} fps"
         )
@@ -179,6 +203,7 @@ class VideoGenerator:
 
         output = self.pipeline(
             prompt=prompt,
+            negative_prompt=negative_prompt,
             num_frames=num_frames,
             height=height,
             width=width,
