@@ -119,7 +119,7 @@ class VideoGenerator:
             # video will not reflect the prompt.
             if hasattr(self.pipeline, "text_encoder") and self.pipeline.text_encoder is not None:
                 text_encoder = self.pipeline.text_encoder
-                sync_method = "no compatible method found"
+                sync_method = None
                 sync_success = False
                 has_shared = hasattr(text_encoder, "shared")
                 try:
@@ -139,16 +139,24 @@ class VideoGenerator:
                         text_encoder.encoder.embed_tokens = text_encoder.shared
                         logger.info("Text encoder embeddings synced from shared weights")
                         sync_success = True
-                except (AttributeError, ValueError, TypeError) as sync_error:
+                except ValueError as sync_error:
+                    logger.error(
+                        f"Failed to sync text encoder embeddings using {sync_method or 'no compatible method found'} "
+                        f"({type(sync_error).__name__}): {sync_error}"
+                    )
+                    raise
+                except (AttributeError, TypeError) as sync_error:
                     logger.warning(
-                        f"Failed to sync text encoder embeddings using {sync_method} "
+                        f"Failed to sync text encoder embeddings using {sync_method or 'no compatible method found'} "
                         f"({type(sync_error).__name__}): {sync_error}"
                     )
 
                 if sync_success and hasattr(text_encoder, "tie_weights"):
                     text_encoder.tie_weights()
                     logger.info("Text encoder weights tied successfully")
-                elif not sync_success:
+                elif sync_success:
+                    logger.info("Text encoder embeddings synced; tie_weights not available")
+                else:
                     logger.warning("Skipping text encoder tie_weights because embedding sync failed")
 
             # Enable CPU offloading if requested (saves VRAM, CUDA only)
