@@ -40,11 +40,11 @@ class VideoGenerationRequest(BaseModel):
         examples=["A serene sunset over the ocean with waves gently rolling"]
     )
     duration: float = Field(
-        default=2.0,
+        default=8.0,
         ge=1.0,
         le=10.0,
         description="Duration of the video in seconds (1-10). Shorter videos use less memory.",
-        examples=[2.0]
+        examples=[8.0]
     )
     num_frames: Optional[int] = Field(
         default=None,
@@ -54,11 +54,11 @@ class VideoGenerationRequest(BaseModel):
         examples=[33]
     )
     fps: int = Field(
-        default=16,
+        default=10,
         ge=8,
         le=30,
         description="Frames per second (8-30)",
-        examples=[16]
+        examples=[10]
     )
     width: int = Field(
         default=480,
@@ -103,8 +103,8 @@ class VideoGenerationRequest(BaseModel):
         json_schema_extra = {
             "example": {
                 "prompt": "A serene sunset over the ocean with waves gently rolling",
-                "duration": 2.0,
-                "fps": 16,
+                "duration": 8.0,
+                "fps": 10,
                 "width": 480,
                 "height": 320,
                 "num_inference_steps": 25,
