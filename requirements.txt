@@ -22,6 +22,9 @@ sentencepiece>=0.2.0
 # Video processing
 imageio[ffmpeg]>=2.34.0
 
+# Text cleaning (required by diffusers Wan pipeline)
+ftfy>=6.1.0
+
 # General
 pillow>=10.0.0
 numpy>=1.26.0
